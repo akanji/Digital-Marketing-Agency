@@ -1,0 +1,9 @@
+{
+  "name": "AOS: Digital You Demand",
+  "description": "Multi-tenant Agency Operating System (AOS) for white-label marketing automation, team orchestration, and client lifecycle management.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}

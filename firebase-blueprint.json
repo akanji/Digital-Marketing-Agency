@@ -1,0 +1,175 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User profile and overall progress summary",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "displayName": { "type": "string", "description": "User's full name" },
+        "email": { "type": "string", "format": "email", "description": "User's email" },
+        "photoURL": { "type": "string", "description": "User's profile picture URL" },
+        "role": { "type": "string", "enum": ["user", "admin"], "description": "User role" },
+        "isVerified": { "type": "boolean", "description": "Whether identity is verified" },
+        "subscription": { "type": "string", "enum": ["free", "pro", "enterprise"], "description": "User subscription tier" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Account creation date" }
+      },
+      "required": ["uid", "email"]
+    },
+    "CourseProgress": {
+      "title": "Course Progress",
+      "description": "Progress tracking for a specific course domain",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "UID of the user" },
+        "domainId": { "type": "string", "description": "ID of the course domain" },
+        "completedLessons": { "type": "array", "items": { "type": "integer" }, "description": "Indices of completed lessons" },
+        "quizScore": { "type": "integer", "description": "Highest quiz score achieved" },
+        "lastUpdated": { "type": "string", "format": "date-time", "description": "Last update timestamp" }
+      },
+      "required": ["userId", "domainId"]
+    },
+    "QuizAttempt": {
+      "title": "Quiz Attempt",
+      "description": "Record of a single quiz attempt",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "UID of the user" },
+        "domainId": { "type": "string", "description": "ID of the course domain" },
+        "score": { "type": "integer", "description": "Score achieved (0-100)" },
+        "timestamp": { "type": "string", "format": "date-time", "description": "When the quiz was taken" }
+      },
+      "required": ["userId", "domainId", "score", "timestamp"]
+    },
+    "Certificate": {
+      "title": "Certificate",
+      "description": "Issued certificate of completion",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "UID of the recipient" },
+        "userName": { "type": "string", "description": "Name on the certificate" },
+        "certId": { "type": "string", "description": "Unique certificate ID" },
+        "issuedAt": { "type": "string", "format": "date-time", "description": "Date of issuance" },
+        "verificationUrl": { "type": "string", "description": "URL to verify the certificate" }
+      },
+      "required": ["userId", "certId", "issuedAt"]
+    },
+    "Verification": {
+      "title": "Identity Verification",
+      "description": "Identity verification request",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "UID of the user" },
+        "fullName": { "type": "string", "description": "Legal full name" },
+        "idPhotoUrl": { "type": "string", "description": "URL of the uploaded ID photo" },
+        "selfieUrl": { "type": "string", "description": "URL of the uploaded selfie" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"], "description": "Verification status" },
+        "submittedAt": { "type": "string", "format": "date-time", "description": "Submission date" }
+      },
+      "required": ["userId", "fullName", "status", "submittedAt"]
+    },
+    "Quiz": {
+      "title": "Course Quiz",
+      "description": "AI-generated quiz for a course domain",
+      "type": "object",
+      "properties": {
+        "domainId": { "type": "string", "description": "ID of the course domain" },
+        "questions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "q": { "type": "string", "description": "The question text" },
+              "opts": { "type": "array", "items": { "type": "string" }, "description": "Multiple choice options" },
+              "ans": { "type": "integer", "description": "Index of the correct answer" },
+              "explanation": { "type": "string", "description": "Explanation for the correct answer" }
+            },
+            "required": ["q", "opts", "ans"]
+          }
+        },
+        "generatedAt": { "type": "string", "format": "date-time", "description": "When the quiz was generated" },
+        "version": { "type": "integer", "description": "Version number of the quiz" }
+      },
+      "required": ["domainId", "questions", "generatedAt"]
+    },
+    "CourseContent": {
+      "title": "Course Content",
+      "description": "AI-generated course content (syllabi, slides, etc.)",
+      "type": "object",
+      "properties": {
+        "domainId": { "type": "string", "description": "ID of the course domain" },
+        "level": { "type": "string", "enum": ["standard", "advanced"], "description": "Content level" },
+        "syllabus": { "type": "string", "description": "Full course syllabus in markdown" },
+        "slides": { "type": "array", "items": { "type": "string" }, "description": "Slide content/descriptions" },
+        "generatedAt": { "type": "string", "format": "date-time", "description": "When the content was generated" }
+      },
+      "required": ["domainId", "level", "syllabus", "generatedAt"]
+    },
+    "GeneratedVideo": {
+      "title": "Generated Video",
+      "description": "Metadata for an AI-generated course video",
+      "type": "object",
+      "properties": {
+        "domainId": { "type": "string", "description": "ID of the course domain" },
+        "level": { "type": "string", "enum": ["standard", "advanced"], "description": "Content level" },
+        "title": { "type": "string", "description": "Video title" },
+        "videoUrl": { "type": "string", "description": "URL of the generated video" },
+        "thumbnailUrl": { "type": "string", "description": "URL of the video thumbnail" },
+        "transcript": { "type": "string", "description": "Video transcript" },
+        "generatedAt": { "type": "string", "format": "date-time", "description": "When the video was generated" }
+      },
+      "required": ["domainId", "level", "videoUrl", "generatedAt"]
+    },
+    "AIPowerAsset": {
+      "title": "AI Power Asset",
+      "description": "AI-generated asset (Canva doc, Slides, or Video) for a specific lesson",
+      "type": "object",
+      "properties": {
+        "catId": { "type": "string", "description": "Category ID" },
+        "itemId": { "type": "string", "description": "Lesson title or ID" },
+        "toolId": { "type": "string", "enum": ["canva", "slides", "video"], "description": "Type of tool used" },
+        "content": { "type": "object", "description": "The generated content (string for canva, array for slides, object for video)" },
+        "generatedAt": { "type": "string", "format": "date-time", "description": "Generation timestamp" }
+      },
+      "required": ["catId", "itemId", "toolId", "content", "generatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile documents"
+    },
+    "/users/{userId}/progress/{domainId}": {
+      "schema": "CourseProgress",
+      "description": "Course progress for each domain"
+    },
+    "/users/{userId}/quizAttempts/{attemptId}": {
+      "schema": "QuizAttempt",
+      "description": "History of quiz attempts"
+    },
+    "/certificates/{certId}": {
+      "schema": "Certificate",
+      "description": "Publicly verifiable certificates"
+    },
+    "/verifications/{userId}": {
+      "schema": "Verification",
+      "description": "Identity verification requests"
+    },
+    "/quizzes/{domainId}": {
+      "schema": "Quiz",
+      "description": "AI-generated quizzes for each domain"
+    },
+    "/courseContents/{contentId}": {
+      "schema": "CourseContent",
+      "description": "AI-generated course contents"
+    },
+    "/generatedVideos/{videoId}": {
+      "schema": "GeneratedVideo",
+      "description": "AI-generated course videos"
+    },
+    "/aiPowerAssets/{assetId}": {
+      "schema": "AIPowerAsset",
+      "description": "AI-generated power assets (docs, slides, videos)"
+    }
+  }
+}

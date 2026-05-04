@@ -1,0 +1,58 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-display: "Space Grotesk", sans-serif;
+
+  --color-agency-bg: #F8F9FA;
+  --color-agency-panel: #FFFFFF;
+  --color-agency-sidebar: #0F1115;
+  --color-agency-accent: var(--agency-accent, #3B82F6); /* Dynamic Runtime Color */
+  --color-agency-ink: #141414;
+  --color-agency-muted: #64748B;
+  --color-agency-border: #E2E8F0;
+}
+
+@layer base {
+  body {
+    @apply bg-agency-bg text-agency-ink font-sans antialiased;
+  }
+}
+
+@layer components {
+  .panel-card {
+    @apply bg-agency-panel border border-agency-border rounded-xl shadow-sm transition-all duration-200;
+  }
+  
+  .sidebar-item {
+    @apply flex items-center gap-3 px-4 py-2.5 rounded-lg text-agency-muted transition-colors hover:bg-white/5 hover:text-white cursor-pointer;
+  }
+  
+  .sidebar-item-active {
+    @apply flex items-center gap-3 px-4 py-2.5 rounded-lg bg-agency-accent/10 text-agency-accent hover:bg-agency-accent/20 hover:text-agency-accent cursor-pointer;
+  }
+
+  .stat-card {
+    @apply p-6 bg-agency-panel border border-agency-border rounded-xl shadow-sm transition-all duration-200 flex flex-col gap-1;
+  }
+}
+
+/* Custom scrollbar for a technical feel */
+
+@layer components {
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02);
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+}
