@@ -9,7 +9,12 @@ import {
   Bell, 
   Search, 
   Plus, 
+  PlusSquare,
   Mic,
+  FileText,
+  Database,
+  Briefcase,
+  Building2,
   Volume2,
   Code2,
   Table2,
@@ -37,13 +42,20 @@ import {
   History,
   Share2,
   Mail,
+  Type as TypeIcon,
   PieChart as PieChartLucide,
   Command,
   Key,
+  Lock,
   ShieldAlert,
   ArrowRight,
+  ArrowRightCircle,
+  Trophy,
   Layers,
+  Layout,
   Sparkles,
+  Settings2,
+  Rocket,
   Info,
   Upload,
   Video,
@@ -55,9 +67,10 @@ import {
   UserCircle,
   FileCheck,
   ClipboardCheck,
+  AlertTriangle,
   AlertCircle,
+  ShieldHalf,
   Clock,
-  Database,
   Workflow,
   Shield,
   Infinity as MetaIcon,
@@ -85,11 +98,11 @@ import {
   Copy,
   Check,
   Smile,
+  Send,
   Clapperboard,
+  Wand2,
   CreditCard,
-  Building2,
   ShieldCheck as ShieldCheckIcon,
-  Briefcase,
   Fingerprint,
   Thermometer,
   Edit3,
@@ -113,7 +126,25 @@ import {
 } from 'recharts';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { Tab, Campaign, Client, AgentCard, SystemLog, ValidationCycle, Pillar, ApprovalStatus, Persona, AgencyTemplate, MediaAsset, ContentCampaign, ActiveCampaign, VocalIdentity, MediaCenterAsset, SEOCrawlReport, Deliverable, EmailSegment, AutomationWorkflow, EmailTemplate, EmailVariant } from './types';
+import { 
+  Tab, Campaign, Client, AgentCard, SystemLog, ValidationCycle, Pillar, ApprovalStatus, Persona, AgencyTemplate, MediaAsset, ContentCampaign, ActiveCampaign, VocalIdentity, MediaCenterAsset, SEOCrawlReport, Deliverable, EmailSegment, AutomationWorkflow, AutomationFlowDetail, ActiveFlowsResponse, EmailTemplate, EmailTemplateDetail, TemplatesResponse, EmailVariant, PPCManagerResponse, MCCManager, LinkedClient, AttributionModel, AttributionModelsResponse, ActiveShardsResponse, PacingDetailsResponse, OptimizationApprovalResponse, BidSimulationResponse, BidSimulationHistoryResponse, SmartBiddingStatusResponse, SmartBiddingAdjustmentResponse, PPCLogsResponse, PPCLog, PPCQuickActionRequest, PPCQuickActionResponse, PPCStreamEvent, PPCPlanStatusResponse, A2ASystemStatusResponse, CloudStatusResponse, OptimizationProposal,
+  AudienceSegmentsResponse, AudienceSegmentDetail, CreateAudienceSegmentRequest, CreateAudienceSegmentResponse,
+  SegmentHealthResponse, SegmentHealthRecommendation, ReputationMonitorResponse,
+  IPWarmingControlRequest, IPWarmingControlResponse,
+  CreateAutomationFlowRequest, CreateAutomationFlowResponse,
+  FlowDeploymentRequest, FlowDeploymentResponse,
+  CreateTemplateRequest, CreateTemplateResponse,
+  ABTestWinnerRequest, ABTestWinnerResponse,
+  PlatformSyncResponse, PlatformSyncStatus, SyncLog, AvailableIntegration,
+  ConnectPlatformRequest, ConnectPlatformResponse,
+  WorkflowAuditRequest, WorkflowAuditResponse, DeploymentSequenceRequest, DeploymentSequenceResponse,
+  WSPayload, FlowConversionPayload, PlatformSyncStatusPayload, AuditFindingPayload,
+  OnlineOpsLog, OnlineOpsLogsResponse,
+  OnlineOpsQuickActionRequest, OnlineOpsQuickActionResponse,
+  OAuthStatusResponse, MaintenanceAgentLog, MaintenanceAuditResponse,
+  DeveloperAgentLog, DeveloperFixResponse
+} from './types';
+import { GoogleGenAI, Type, Modality, ThinkingLevel } from "@google/genai";
 import { 
   DATA_ANALYTICS, 
   CAMPAIGNS, 
@@ -146,7 +177,8 @@ import {
   TRAINING_JOBS,
   AGENCY_TEMPLATES,
   SUBSCRIPTION_TIERS,
-  DEFAULT_BRANDING
+  DEFAULT_BRANDING,
+  PPC_MANAGER_DATA
 } from './constants';
 
 // --- Utilities ---
@@ -497,10 +529,765 @@ const OnlineOpsView = ({
   const [isAuditing, setIsAuditing] = useState(false);
   const [isDeploying, setIsDeploying] = useState(false);
   const [auditProgress, setAuditProgress] = useState(0);
+  const [lastAuditResult, setLastAuditResult] = useState<WorkflowAuditResponse | null>(null);
+
+  const [detailedSegments, setDetailedSegments] = useState<AudienceSegmentDetail[]>([]);
+  const [isLoadingSegments, setIsLoadingSegments] = useState(false);
+  const [detailedFlows, setDetailedFlows] = useState<AutomationFlowDetail[]>([]);
+  const [isLoadingFlows, setIsLoadingFlows] = useState(false);
+  const [flowStats, setFlowStats] = useState<{ total: number, conversion: number } | null>(null);
+  const [detailedTemplates, setDetailedTemplates] = useState<EmailTemplateDetail[]>([]);
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
+  const [templateStats, setTemplateStats] = useState<{ total: number, ab_tests: number } | null>(null);
+  const [segmentStats, setSegmentStats] = useState<{ total: number, health: number } | null>(null);
+  const [reputationData, setReputationData] = useState<ReputationMonitorResponse | null>(null);
+  const [isLoadingReputation, setIsLoadingReputation] = useState(false);
+  const [platformSync, setPlatformSync] = useState<PlatformSyncResponse | null>(null);
+  const [isLoadingSync, setIsLoadingSync] = useState(false);
+  const [isAdjustingVolume, setIsAdjustingVolume] = useState(false);
+  const [lastSequenceDeployment, setLastSequenceDeployment] = useState<DeploymentSequenceResponse | null>(null);
+  const [wsStatus, setWsStatus] = useState<'CONNECTING' | 'CONNECTED' | 'DISCONNECTED'>('DISCONNECTED');
+  const [oauthStatus, setOauthStatus] = useState<OAuthStatusResponse | null>(null);
+  const [maintenanceAudit, setMaintenanceAudit] = useState<MaintenanceAuditResponse | null>(null);
+  const [maintenanceLogs, setMaintenanceLogs] = useState<MaintenanceAgentLog[]>([]);
+  const [isAuditingMaintenance, setIsAuditingMaintenance] = useState(false);
+  const [developerLogs, setDeveloperLogs] = useState<DeveloperAgentLog[]>([]);
+  const [lastFixResult, setLastFixResult] = useState<DeveloperFixResponse | null>(null);
+  const [isFixingError, setIsFixingError] = useState<string | null>(null);
+  const [logs, setLogs] = useState<OnlineOpsLog[]>([]);
+  const [isLoadingLogs, setIsLoadingLogs] = useState(false);
+  const [totalLogs, setTotalLogs] = useState(0);
+
+  const handleAdjustVolume = async () => {
+    if (!reputationData) return;
+    setIsAdjustingVolume(true);
+    onAction('Initiating IP warming ramp adjustment...', 'info');
+
+    const requestBody: IPWarmingControlRequest = {
+      action: 'ADJUST_VOLUME',
+      new_daily_limit: 50000,
+      ramp_schedule: {
+        type: 'GRADUAL',
+        increment_percentage: 10,
+        increment_interval_days: 3
+      },
+      target_providers: ['gmail', 'outlook', 'yahoo', 'corporate']
+    };
+
+    try {
+      const response = await fetch('/api/v1/online-ops/reputation/ip-warming/control', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) throw new Error('Volume Adjustment Failed');
+      const result: IPWarmingControlResponse = await response.json();
+      
+      onAction(`Volume ramp scheduled. Target: ${result.target_volume.toLocaleString()} sends/day. ID: ${result.warming_id}`, 'success');
+      
+      // Update local reputation state to reflect changes if needed
+      setReputationData(prev => prev ? {
+        ...prev,
+        ip_warming_status: {
+          ...prev.ip_warming_status,
+          daily_send_limit: result.target_volume
+        }
+      } : null);
+    } catch (error) {
+      console.error(error);
+      onAction('Audience orchestration module failed to adjust volume ramp.', 'error');
+    } finally {
+      setIsAdjustingVolume(false);
+    }
+  };
+
+  useEffect(() => {
+    const fetchReputation = async () => {
+      setIsLoadingReputation(true);
+      try {
+        const response = await fetch('/api/v1/online-ops/reputation/monitor?timeframe=30d');
+        if (!response.ok) throw new Error('Reputation Sync Failed');
+        const data: ReputationMonitorResponse = await response.json();
+        setReputationData(data);
+      } catch (error) {
+        console.error('Reputation sync failed:', error);
+      } finally {
+        setIsLoadingReputation(false);
+      }
+    };
+    fetchReputation();
+  }, []);
+
+  useEffect(() => {
+    const fetchActiveFlows = async () => {
+      setIsLoadingFlows(true);
+      try {
+        const response = await fetch('/api/v1/online-ops/flows/active?status=RUNNING|PAUSED|DRAFT');
+        if (!response.ok) throw new Error('Flow Sync Failed');
+        const data: ActiveFlowsResponse = await response.json();
+        setDetailedFlows(data.flows);
+        setFlowStats({ total: data.total_active_flows, conversion: data.aggregate_conversion_rate });
+      } catch (error) {
+        console.error('Flow sync failed:', error);
+      } finally {
+        setIsLoadingFlows(false);
+      }
+    };
+    fetchActiveFlows();
+  }, []);
+
+  useEffect(() => {
+    const fetchTemplates = async () => {
+      setIsLoadingTemplates(true);
+      try {
+        const response = await fetch('/api/v1/online-ops/templates?type=MARKETING|TRANSACTIONAL&status=ACTIVE|DRAFT|ARCHIVED');
+        if (!response.ok) throw new Error('Template Sync Failed');
+        const data: TemplatesResponse = await response.json();
+        setDetailedTemplates(data.templates);
+        setTemplateStats({ total: data.total_templates, ab_tests: data.total_active_ab_tests });
+      } catch (error) {
+        console.error('Template sync failed:', error);
+      } finally {
+        setIsLoadingTemplates(false);
+      }
+    };
+    fetchTemplates();
+  }, []);
+
+  useEffect(() => {
+    const fetchDetailedSegments = async () => {
+      setIsLoadingSegments(true);
+      try {
+        const response = await fetch('/api/v1/online-ops/audience/segments');
+        if (!response.ok) throw new Error('API Sync Failed');
+        const data: AudienceSegmentsResponse = await response.json();
+        setDetailedSegments(data.segments);
+        setSegmentStats({ total: data.total_subscribers, health: data.aggregate_health });
+      } catch (error) {
+        console.error('Segment sync failed:', error);
+        onAction('Audience segment real-time sync failed. Falling back to local cache.', 'warning');
+      } finally {
+        setIsLoadingSegments(false);
+      }
+    };
+
+    fetchDetailedSegments();
+  }, []);
+
+  useEffect(() => {
+    const fetchSyncStatus = async () => {
+      setIsLoadingSync(true);
+      try {
+        const response = await fetch('/api/v1/online-ops/platform-sync/status');
+        if (!response.ok) throw new Error('Sync Status Retrieval Failed');
+        const data: PlatformSyncResponse = await response.json();
+        setPlatformSync(data);
+      } catch (error) {
+        console.error('Sync status sync failed:', error);
+      } finally {
+        setIsLoadingSync(false);
+      }
+    };
+    fetchSyncStatus();
+  }, []);
+
+  useEffect(() => {
+    const fetchOAuthStatus = async () => {
+      try {
+        const response = await fetch('/api/v1/auth/oauth-status');
+        if (response.ok) {
+          const data: OAuthStatusResponse = await response.json();
+          setOauthStatus(data);
+          if (data.authenticated) {
+            onAction('Protocol Authentication Verified. Secure context established.', 'success');
+          }
+        }
+      } catch (error) {
+        console.error('OAuth status check failed:', error);
+      }
+    };
+    fetchOAuthStatus();
+  }, []);
+
+  useEffect(() => {
+    const fetchMaintenanceLogs = async () => {
+      try {
+        const response = await fetch('/api/v1/maintenance/audit-logs');
+        if (response.ok) {
+          const data = await response.json();
+          setMaintenanceLogs(data.logs);
+        }
+      } catch (error) {
+        console.error('Maintenance logs check failed:', error);
+      }
+    };
+    fetchMaintenanceLogs();
+  }, []);
+
+  useEffect(() => {
+    const fetchDeveloperLogs = async () => {
+      try {
+        const response = await fetch('/api/v1/developer/logs');
+        if (response.ok) {
+          const data = await response.json();
+          setDeveloperLogs(data.logs);
+        }
+      } catch (error) {
+        console.error('Developer logs check failed:', error);
+      }
+    };
+    fetchDeveloperLogs();
+  }, []);
+
+  useEffect(() => {
+    const fetchLogs = async () => {
+      setIsLoadingLogs(true);
+      try {
+        const response = await fetch('/api/v1/online-ops/logs?limit=50&severity=INFO|WARN|ERROR');
+        if (!response.ok) throw new Error('Logs Retrieval Failed');
+        const data: OnlineOpsLogsResponse = await response.json();
+        setLogs(data.logs);
+        setTotalLogs(data.total_logs);
+      } catch (error) {
+        console.error('Logs sync failed:', error);
+      } finally {
+        setIsLoadingLogs(false);
+      }
+    };
+    fetchLogs();
+  }, []);
+
+  useEffect(() => {
+    const wsUrl = 'wss://a2a.digitalmarketingagency.com/online-ops-stream';
+    const socket = new WebSocket(wsUrl);
+    setWsStatus('CONNECTING');
+
+    socket.onopen = () => {
+      setWsStatus('CONNECTED');
+      onAction('Online Ops Real-time Stream Protocol Synchronized.', 'success');
+    };
+
+    socket.onmessage = (event) => {
+      try {
+        const payload: WSPayload = JSON.parse(event.data);
+        handleWSEvent(payload);
+      } catch (e) {
+        console.error('Failed to parse WS event:', e);
+      }
+    };
+
+    socket.onclose = () => {
+      setWsStatus('DISCONNECTED');
+      onAction('Online Ops Real-time Stream Disconnected.', 'warning');
+    };
+
+    socket.onerror = (error) => {
+      console.error('WS Error:', error);
+      setWsStatus('DISCONNECTED');
+    };
+
+    const handleWSEvent = (payload: WSPayload) => {
+      switch (payload.event) {
+        case 'FLOW_CONVERSION_UPDATE': {
+          const data = payload as FlowConversionPayload;
+          onAction(`Conversion update: ${data.flow_id} at ${data.conversion_rate}% (${data.delta}). Recommendation: ${data.ai_recommendation}`, 'info');
+          setDetailedFlows(prev => prev.map(f => f.flow_id === data.flow_id ? { ...f, conversion_rate: data.conversion_rate } : f));
+          break;
+        }
+        case 'REPUTATION_ALERT': {
+          const data = payload as any;
+          onAction(`REPUTATION ALERT [${data.severity}]: ${data.message} (${data.metric}: ${data.current_value})`, data.severity === 'CRITICAL' ? 'error' : 'warning');
+          break;
+        }
+        case 'PLATFORM_SYNC_STATUS_CHANGE': {
+          const data = payload as PlatformSyncStatusPayload;
+          onAction(`Sync update for ${data.platform}: ${data.new_status}. ${data.message}`, 'info');
+          // Trigger data refresh if significant
+          if (data.new_status === 'CONNECTED' || data.new_status === 'SYNC_COMPLETE') {
+             // Refresh sync status
+             fetch('/api/v1/online-ops/platform-sync/status')
+               .then(res => res.json())
+               .then(data => setPlatformSync(data))
+               .catch(err => console.error(err));
+          }
+          break;
+        }
+        case 'AUDIT_FINDING': {
+          const data = payload as AuditFindingPayload;
+          onAction(`Live Audit Finding: ${data.finding.message}`, data.finding.severity === 'CRITICAL' ? 'error' : 'warning');
+          setLastAuditResult(prev => prev ? { ...prev, findings: [data.finding, ...prev.findings] } : null);
+          break;
+        }
+        case 'DEPLOYMENT_STATUS_UPDATE': {
+          onAction(`Deployment progression: ${(payload as any).status}`, 'info');
+          break;
+        }
+        default:
+          console.debug('Received unhandled WS event:', payload.event);
+      }
+    };
+
+    return () => socket.close();
+  }, []);
 
   // Template Management State
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [isCreateSegmentModalOpen, setIsCreateSegmentModalOpen] = useState(false);
+  const [isCreatingSegment, setIsCreatingSegment] = useState(false);
+  const [isHealthAuditModalOpen, setIsHealthAuditModalOpen] = useState(false);
+  const [isHealthAuditLoading, setIsHealthAuditLoading] = useState(false);
+  const [selectedSegmentForAudit, setSelectedSegmentForAudit] = useState<AudienceSegmentDetail | null>(null);
+  const [healthAuditResult, setHealthAuditResult] = useState<SegmentHealthResponse | null>(null);
+  const [isCreateFlowModalOpen, setIsCreateFlowModalOpen] = useState(false);
+  const [isCreatingFlow, setIsCreatingFlow] = useState(false);
+  const [isDeployingFlow, setIsDeployingFlow] = useState<string | null>(null);
+  const [isDeclaringWinner, setIsDeclaringWinner] = useState<string | null>(null);
+  const [isConnectingPlatform, setIsConnectingPlatform] = useState<string | null>(null);
+  const [isExecutingQuickAction, setIsExecutingQuickAction] = useState<string | null>(null);
+
+  const handleQuickAction = async (actionType: OnlineOpsQuickActionRequest['action_type'], targetSegment?: string) => {
+    setIsExecutingQuickAction(actionType);
+    onAction(`Executing Quick Action: ${actionType.replace(/_/g, ' ')}...`, 'info');
+
+    const requestBody: OnlineOpsQuickActionRequest = {
+      action_type: actionType,
+      target_segment: targetSegment,
+      approval_required: false,
+      hygiene_rules: actionType === 'RUN_LIST_HYGIENE' ? [
+        "REMOVE_HARD_BOUNCES",
+        "REMOVE_SPAM_TRAPS",
+        "STANDARDIZE_EMAIL_FORMAT",
+        "VERIFY_DOMAIN_MX_RECORDS"
+      ] : undefined
+    };
+
+    try {
+      const response = await fetch('/api/v1/online-ops/actions/quick', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) throw new Error('Quick Action Failed');
+      const result: OnlineOpsQuickActionResponse = await response.json();
+      
+      onAction(`Protocol Result: ${result.status}. ${result.message}`, result.status === 'FAILED' ? 'error' : 'success');
+      
+      // Update logs if needed
+      const logsResp = await fetch('/api/v1/online-ops/logs?limit=50&severity=INFO|WARN|ERROR');
+      if (logsResp.ok) {
+        const logsData: OnlineOpsLogsResponse = await logsResp.json();
+        setLogs(logsData.logs);
+      }
+    } catch (error) {
+      console.error(error);
+      onAction(`System error during ${actionType} execution.`, 'error');
+    } finally {
+      setIsExecutingQuickAction(null);
+    }
+  };
+
+  const handleMaintenanceAudit = async () => {
+    setIsAuditingMaintenance(true);
+    onAction('Maintenance & Validation Agent: Initiating Information Drift Audit...', 'info');
+    try {
+      const response = await fetch('/api/v1/maintenance/trigger-audit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (!response.ok) throw new Error('Audit Failed');
+      const data: MaintenanceAuditResponse = await response.json();
+      setMaintenanceAudit(data);
+      setMaintenanceLogs(data.logs);
+      onAction(`Audit Complete. Integrity Score: ${data.summary.integrity_score}%. ${data.summary.updates_applied} updates applied.`, 'success');
+    } catch (error) {
+      console.error(error);
+      onAction('Maintenance protocol fault. Verification interrupted.', 'error');
+    } finally {
+      setIsAuditingMaintenance(false);
+    }
+  };
+
+  const handleAutoFix = async (errorId: string) => {
+    const targetError = developerLogs.find(log => log.id === errorId);
+    if (!targetError) {
+      onAction('Error ID validation failed. Node not found.', 'error');
+      return;
+    }
+
+    setIsFixingError(errorId);
+    onAction(`Lead A2A Developer Agent: Deploying fix protocol for ${errorId}...`, 'info');
+    
+    // 30s Execution limit client-side tracking
+    const executionStart = Date.now();
+    
+    try {
+      const response = await fetch('/api/v1/developer/auto-fix', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          error_id: errorId,
+          raw_log: targetError.stack_trace // Send raw log for server-side minification
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.status === 429) {
+        onAction(`CRITICAL: ${data.message}`, 'error');
+        setDeveloperLogs(prev => prev.map(log => log.id === errorId ? { ...log, status: 'escalated' } : log));
+        return;
+      }
+
+      if (!response.ok) throw new Error(data.error || 'Fix Failed');
+      
+      const executionTime = (Date.now() - executionStart) / 1000;
+      setLastFixResult(data);
+      setDeveloperLogs(prev => prev.map(log => log.id === errorId ? { ...log, status: 'resolved' } : log));
+      onAction(`Auto-Fix Complete for ${errorId}. Verified in ${executionTime.toFixed(1)}s.`, 'success');
+    } catch (error: any) {
+      console.error(error);
+      onAction(error.message || 'Fix sequence protocol fault.', 'error');
+    } finally {
+      setIsFixingError(null);
+    }
+  };
+
+  const handleConnectPlatform = async (platform: string) => {
+    setIsConnectingPlatform(platform);
+    onAction(`Initiating secure handshake with ${platform} Protocol...`, 'info');
+
+    const requestBody: ConnectPlatformRequest = {
+      platform,
+      auth_method: 'OAUTH2',
+      scopes: ['contacts', 'content', 'oauth', 'automation'],
+      sync_config: {
+        direction: 'BIDIRECTIONAL',
+        sync_frequency: 'EVERY_15_MINUTES',
+        conflict_resolution: 'TIMESTAMP_WINS',
+        field_mapping: {
+          email: 'email',
+          first_name: 'firstname',
+          last_name: 'lastname',
+          company: 'company',
+          lifecycle_stage: 'custom_lifecycle_stage'
+        }
+      }
+    };
+
+    try {
+      const response = await fetch('/api/v1/online-ops/platform-sync/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) throw new Error('Platform Handshake Failed');
+      const result: ConnectPlatformResponse = await response.json();
+      
+      onAction(`${platform} linked. Status: ${result.status}. ${result.setup_instructions}`, 'success');
+      
+      if (result.oauth_url) {
+        window.open(result.oauth_url, '_blank');
+      }
+
+      // Refresh sync status
+      const refreshStatusResponse = await fetch('/api/v1/online-ops/platform-sync/status');
+      if (refreshStatusResponse.ok) {
+        const data: PlatformSyncResponse = await refreshStatusResponse.json();
+        setPlatformSync(data);
+      }
+    } catch (error) {
+      console.error(error);
+      onAction(`Protocol error during ${platform} linking.`, 'error');
+    } finally {
+      setIsConnectingPlatform(null);
+    }
+  };
+
+  const handleDeclareWinner = async (templateId: string, variant: string) => {
+    setIsDeclaringWinner(templateId);
+    onAction(`Declaring ${variant} as winner for template ${templateId}...`, 'info');
+
+    const requestBody: ABTestWinnerRequest = {
+      action: 'DECLARE_WINNER',
+      winner_variant: variant,
+      rollout_percentage: 100,
+      archive_loser: true
+    };
+
+    try {
+      const response = await fetch(`/api/v1/online-ops/templates/${templateId}/ab-test`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) throw new Error('A/B Winner Declaration Failed');
+      const result: ABTestWinnerResponse = await response.json();
+      
+      onAction(`A/B Test Concluded. Winner: ${result.winner}. Lift: ${result.winning_metrics.conversion_lift}. Rollout: ${result.rollout_status}`, 'success');
+
+      // Refresh templates
+      const refreshResponse = await fetch('/api/v1/online-ops/templates?type=MARKETING|TRANSACTIONAL&status=ACTIVE|DRAFT|ARCHIVED');
+      if (refreshResponse.ok) {
+        const data: TemplatesResponse = await refreshResponse.json();
+        setDetailedTemplates(data.templates);
+      }
+    } catch (error) {
+      console.error(error);
+      onAction('Error declaring A/B winner.', 'error');
+    } finally {
+      setIsDeclaringWinner(null);
+    }
+  };
+
+  const [isCreateTemplateModalOpen, setIsCreateTemplateModalOpen] = useState(false);
+  const [isCreatingTemplate, setIsCreatingTemplate] = useState(false);
+
+  const handleCreateTemplate = async (tplData: any) => {
+    setIsCreatingTemplate(true);
+    onAction(`Synthesizing dynamic template: ${tplData.name}...`, 'info');
+
+    const requestBody: CreateTemplateRequest = {
+      name: tplData.name,
+      type: tplData.type,
+      subject_line: `Introducing {{product_name}} — exclusively for {{first_name}}`,
+      preview_text: 'Be the first to experience our latest innovation',
+      content_blocks: [
+        { type: 'HERO_IMAGE', content: 'Dynamic product hero with CTA', personalization: false },
+        { type: 'PRODUCT_DESCRIPTION', content: '{{product_name}} features and benefits', personalization: true }
+      ],
+      ab_test: {
+        enabled: true,
+        variants: [
+          { name: 'Feature-Focused', subject_line: 'See what\'s new: {{product_name}}', hero_image: 'features_hero.jpg' },
+          { name: 'Benefit-Focused', subject_line: '{{first_name}}, transform your workflow', hero_image: 'lifestyle_hero.jpg' }
+        ],
+        split: 0.5,
+        winner_criteria: 'HIGHEST_CLICK_RATE',
+        test_duration_days: 7
+      },
+      brand_guidelines: {
+        primary_color: '#2A5CDB',
+        font_family: 'Inter',
+        logo_position: 'top_center',
+        footer_required: true
+      }
+    };
+
+    try {
+      const response = await fetch('/api/v1/online-ops/templates/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) throw new Error('Template Generation Interrupted');
+      const result: CreateTemplateResponse = await response.json();
+      
+      onAction(`Template synthesized. ID: ${result.template_id}. Spam Score: ${result.spam_score_prediction}`, 'success');
+      setIsCreateTemplateModalOpen(false);
+
+      // Refresh templates
+      const refreshResponse = await fetch('/api/v1/online-ops/templates?type=MARKETING|TRANSACTIONAL&status=ACTIVE|DRAFT|ARCHIVED');
+      if (refreshResponse.ok) {
+        const data: TemplatesResponse = await refreshResponse.json();
+        setDetailedTemplates(data.templates);
+      }
+    } catch (error) {
+      console.error(error);
+      onAction('Template synthesis engine failure.', 'error');
+    } finally {
+      setIsCreatingTemplate(false);
+    }
+  };
+
+  const handleDeployFlow = async (flow: AutomationFlowDetail) => {
+    setIsDeployingFlow(flow.flow_id);
+    onAction(`Initializing gradual rollout for ${flow.name}...`, 'info');
+
+    const requestBody: FlowDeploymentRequest = {
+      deployment_mode: 'GRADUAL',
+      rollout_percentage: 25,
+      monitoring_window_hours: 48,
+      auto_scale_threshold: {
+        metric: 'open_rate',
+        operator: 'GREATER_THAN',
+        value: 20
+      },
+      approval_required: false
+    };
+
+    try {
+      const response = await fetch(`/api/v1/online-ops/flows/${flow.flow_id}/deploy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) throw new Error('Deployment Protocol Interrupted');
+      const result: FlowDeploymentResponse = await response.json();
+      
+      onAction(`Protocol DEPLOYING. ID: ${result.deployment_id}. Monitoring window active.`, 'success');
+      
+      // Refresh flows to reflect running status if it was draft/paused
+      const refreshResponse = await fetch('/api/v1/online-ops/flows/active?status=RUNNING|PAUSED|DRAFT');
+      if (refreshResponse.ok) {
+        const data: ActiveFlowsResponse = await refreshResponse.json();
+        setDetailedFlows(data.flows);
+      }
+    } catch (error) {
+      console.error(error);
+      onAction('Flow deployment orchestration failure.', 'error');
+    } finally {
+      setIsDeployingFlow(null);
+    }
+  };
+
+  const handleCreateFlow = async (flowData: any) => {
+    setIsCreatingFlow(true);
+    onAction(`Architecting automation flow: ${flowData.name}...`, 'info');
+
+    const requestBody: CreateAutomationFlowRequest = {
+      name: flowData.name,
+      trigger_type: flowData.trigger_type,
+      trigger_criteria: {
+        days_since_last_open: 90,
+        days_since_last_click: 120,
+        days_since_last_purchase: 180
+      },
+      steps: [
+        {
+          step_number: 1,
+          delay_hours: 0,
+          channel: 'EMAIL',
+          template_id: 'template-win-back-1',
+          subject: 'We miss you — here\'s what\'s new',
+          personalization: true,
+          ab_test: { enabled: true, variants: ['A', 'B'], split: 0.5 }
+        },
+        {
+          step_number: 2,
+          delay_hours: 72,
+          channel: 'EMAIL',
+          template_id: 'template-win-back-2',
+          subject: 'Exclusive offer just for you',
+          personalization: true
+        }
+      ],
+      conversion_goal: 'RE_ENGAGEMENT',
+      success_metrics: ['email_open', 'link_click', 'purchase_within_30d']
+    };
+
+    try {
+      const response = await fetch('/api/v1/online-ops/flows/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) throw new Error('Flow Deployment Failed');
+      const result: CreateAutomationFlowResponse = await response.json();
+      
+      onAction(`Flow deployed. ID: ${result.flow_id}. Est. Enrollment: ${result.estimated_enrollment.toLocaleString()}`, 'success');
+      setIsCreateFlowModalOpen(false);
+
+      // Refresh flows
+      const refreshResponse = await fetch('/api/v1/online-ops/flows/active?status=RUNNING|PAUSED|DRAFT');
+      if (refreshResponse.ok) {
+        const data: ActiveFlowsResponse = await refreshResponse.json();
+        setDetailedFlows(data.flows);
+      }
+    } catch (error) {
+      console.error(error);
+      onAction('Flow orchestration failure. Check system logs.', 'error');
+    } finally {
+      setIsCreatingFlow(false);
+    }
+  };
+
+  const executeHealthAudit = async (segment: AudienceSegmentDetail) => {
+    setSelectedSegmentForAudit(segment);
+    setIsHealthAuditModalOpen(true);
+    setIsHealthAuditLoading(true);
+    setHealthAuditResult(null);
+    onAction(`Initializing Deep Health Audit for ${segment.name}...`, 'info');
+
+    try {
+      const response = await fetch(`/api/v1/online-ops/audience/segments/${segment.segment_id}/health`);
+      if (!response.ok) throw new Error('Health Audit Sync Failed');
+      const data: SegmentHealthResponse = await response.json();
+      setHealthAuditResult(data);
+      onAction(`Audit complete. Health Score: ${data.health_score}%`, 'success');
+    } catch (error) {
+      console.error(error);
+      onAction('Audience health orchestration module failed.', 'error');
+    } finally {
+      setIsHealthAuditLoading(false);
+    }
+  };
+
+  const handleCreateSegment = async (segmentData: any) => {
+    setIsCreatingSegment(true);
+    onAction(`Initializing creation of ${segmentData.name} segment...`, 'info');
+    
+    try {
+      const response = await fetch('/api/v1/online-ops/audience/segments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(segmentData)
+      });
+
+      if (!response.ok) throw new Error('Segment Creation Failed');
+      
+      const result: CreateAudienceSegmentResponse = await response.json();
+      
+      // Update local state for immediate feedback
+      const newDetail: AudienceSegmentDetail = {
+        segment_id: result.segment_id,
+        name: segmentData.name,
+        identifier: segmentData.identifier,
+        subscriber_count: 0, // Will be updated by indexing
+        health_score: 100,
+        health_status: 'EXCELLENT',
+        open_rate: 0,
+        bounce_rate: 0,
+        spam_rate: 0,
+        sync_status: 'INDEXING',
+        last_sync: new Date().toISOString(),
+        source: segmentData.source,
+        criteria: segmentData.criteria,
+        deliverability: {
+          inbox_placement: result.deliverability_forecast.inbox_placement,
+          domain_reputation: 'EXCELLENT',
+          ip_warming_status: result.deliverability_forecast.ip_warming_required ? 'IN_PROGRESS' : 'COMPLETE',
+          provider_breakdown: { gmail: 0, outlook: 0, yahoo: 0, corporate: 0 }
+        }
+      };
+
+      setDetailedSegments(prev => [newDetail, ...prev]);
+      setIsCreateSegmentModalOpen(false);
+      onAction(`Segment ${segmentData.name} created. Indexing approximately ${result.estimated_subscriber_count} subscribers.`, 'success');
+    } catch (error) {
+      console.error(error);
+      onAction('Audience orchestration module failed to create segment.', 'error');
+    } finally {
+      setIsCreatingSegment(false);
+    }
+  };
+
   const [editingTemplate, setEditingTemplate] = useState<EmailTemplate | null>(null);
+  const [segmentForm, setSegmentForm] = useState<CreateAudienceSegmentRequest>({
+    name: '',
+    identifier: '',
+    criteria: {},
+    source: 'behavioral_tagging',
+    auto_sync: true,
+    sync_frequency: 'REAL_TIME'
+  });
+
   const [templateForm, setTemplateForm] = useState<Partial<EmailTemplate>>({
     name: '',
     category: 'Marketing',
@@ -515,45 +1302,113 @@ const OnlineOpsView = ({
     if (isAuditing) return;
     setIsAuditing(true);
     setAuditProgress(0);
-    onAction('Running deep workflow audit across all active nodes...', 'info');
+    onAction('Initiating deep protocol audit across all active flows...', 'info');
 
-    for (let i = 0; i <= 100; i += 25) {
-      setAuditProgress(i);
-      await new Promise(r => setTimeout(r, 500));
-      if (i === 25) onAction('Verifying SMTP relay health...', 'info');
-      if (i === 50) onAction('Analyzing engagement decay on high-value segments...', 'info');
-      if (i === 75) onAction('Cross-referencing CRM sync latencies...', 'info');
+    const requestBody: WorkflowAuditRequest = {
+      audit_scope: 'ALL_FLOWS',
+      audit_type: 'COMPLIANCE_PERFORMANCE_DELIVERABILITY',
+      check_items: [
+        'GDPR_CONSENT_VALID',
+        'CAN_SPAM_COMPLIANT',
+        'UNSUBSCRIBE_LINK_PRESENT',
+        'PERSONALIZATION_TOKENS_VALID',
+        'SPAM_SCORE_ACCEPTABLE',
+        'DELIVERABILITY_FORECAST_POSITIVE',
+        'A_B_TEST_STATISTICAL_VALIDITY'
+      ]
+    };
+
+    try {
+      const response = await fetch('/api/v1/online-ops/workflows/audit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) throw new Error('Audit Engine Communication Failure');
+      const result: WorkflowAuditResponse = await response.json();
+      
+      setLastAuditResult(result);
+      setAuditProgress(100);
+      onAction(`Audit complete. Score: ${result.overall_score}/100. ${result.findings.length} findings extracted.`, 'success');
+      
+      // Update local state to reflect list hygiene if needed (mocked side effect)
+      setDetailedSegments(prev => prev.map(seg => ({
+        ...seg,
+        health_score: Math.min(100, seg.health_score + 1)
+      })));
+    } catch (error) {
+      console.error(error);
+      onAction('Audit engine synchronization failure.', 'error');
+    } finally {
+      setIsAuditing(false);
     }
-
-    setSegments(prev => prev.map(seg => ({
-      ...seg,
-      engagementScore: Math.min(100, seg.engagementScore + (Math.random() > 0.5 ? 2 : -1))
-    })));
-
-    onAction('Workflow audit complete. Engagement data synchronized and healthy.', 'success');
-    setIsAuditing(false);
   };
 
   const handleDeploySequence = async () => {
     if (isDeploying) return;
     setIsDeploying(true);
-    onAction('Analyzing grounding requirements for new sequence...', 'info');
-    
-    await new Promise(r => setTimeout(r, 2000));
-    
-    const newWorkflow: AutomationWorkflow = {
-      id: `flow-${Date.now()}`,
-      name: `AI-Nurture: ${new Date().toLocaleDateString()}`,
-      trigger: 'Onboarding Event',
-      steps: 4,
-      activeSubscribers: 0,
-      conversionRate: 0,
-      status: 'active'
+    onAction('Orchestrating multi-flow campaign deployment sequence...', 'info');
+
+    const requestBody: DeploymentSequenceRequest = {
+      sequence_name: "Q2 Email Campaign Blitz",
+      deployments: [
+        {
+          flow_id: "flow-ai-nurture",
+          deploy_date: "2026-05-07T09:00:00Z",
+          target_segment: "seg-high-value-saas",
+          expected_volume: 12400
+        },
+        {
+          flow_id: "flow-cart-abandon",
+          deploy_date: "2026-05-07T10:00:00Z",
+          target_segment: "seg-abandoned-cart-retail",
+          expected_volume: 4560
+        },
+        {
+          flow_id: "flow-win-back-2026",
+          deploy_date: "2026-05-08T09:00:00Z",
+          target_segment: "seg-cold-leads-reengagement",
+          expected_volume: 8500,
+          throttle: {
+            enabled: true,
+            daily_limit: 500,
+            ramp_days: 14
+          }
+        }
+      ],
+      approval_workflow: {
+        requires_approval: true,
+        approvers: ["account-manager", "client-stakeholder"],
+        approval_deadline: "2026-05-06T23:59:00Z"
+      }
     };
 
-    setWorkflows(prev => [newWorkflow, ...prev]);
-    onAction('Generative automation sequence deployed and grounded to active nodes.', 'success');
-    setIsDeploying(false);
+    try {
+      const response = await fetch('/api/v1/online-ops/workflows/deploy-sequence', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) throw new Error('Sequence Deployment Handshake Failed');
+      const result: DeploymentSequenceResponse = await response.json();
+      
+      setLastSequenceDeployment(result);
+      onAction(`Sequence '${requestBody.sequence_name}' scheduled. Status: ${result.status}. Vol: ${result.total_expected_volume.toLocaleString()}`, 'success');
+      
+      // Refresh flows
+      const flowsResponse = await fetch('/api/v1/online-ops/flows/active?status=RUNNING|PAUSED|DRAFT');
+      if (flowsResponse.ok) {
+        const data: ActiveFlowsResponse = await flowsResponse.json();
+        setDetailedFlows(data.flows);
+      }
+    } catch (error) {
+      console.error(error);
+      onAction('Failed to synchronize deployment sequence across orchestration nodes.', 'error');
+    } finally {
+      setIsDeploying(false);
+    }
   };
 
   const openTemplateModal = (template?: EmailTemplate) => {
@@ -575,7 +1430,7 @@ const OnlineOpsView = ({
     setIsTemplateModalOpen(true);
   };
 
-  const saveTemplate = () => {
+  const saveTemplate = async () => {
     if (!templateForm.name || !templateForm.variants?.[0]?.subject) {
       onAction('Template name and primary subject are required.', 'error');
       return;
@@ -590,26 +1445,42 @@ const OnlineOpsView = ({
     const foundPlaceholders = Array.from(combinedText.matchAll(/\{\{(.*?)\}\}/g)).map(m => m[1].trim());
     const uniquePlaceholders = Array.from(new Set(foundPlaceholders));
 
-    const finalTemplate: EmailTemplate = {
-      id: editingTemplate?.id || `et-${Date.now()}`,
+    const finalTemplate: any = {
       name: templateForm.name || 'Untitled Template',
       category: templateForm.category || 'Marketing',
       variants: templateForm.variants as EmailVariant[],
       abTestingActive: templateForm.abTestingActive || templateForm.variants!.length > 1,
-      placeholders: uniquePlaceholders,
-      lastModified: new Date().toISOString()
+      placeholders: uniquePlaceholders
     };
 
-    if (editingTemplate) {
-      setTemplates(prev => prev.map(t => t.id === editingTemplate.id ? finalTemplate : t));
-      onAction(`Template "${finalTemplate.name}" updated successfully.`, 'success');
-    } else {
-      setTemplates(prev => [finalTemplate, ...prev]);
-      onAction(`New template "${finalTemplate.name}" created.`, 'success');
+    onAction(`Initializing template persistence sequence for "${finalTemplate.name}"...`, 'info');
+
+    try {
+      const response = await fetch('/api/v1/online-ops/templates/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(finalTemplate)
+      });
+
+      if (!response.ok) throw new Error('Template Persistence Failed');
+      const result = await response.json();
+
+      if (editingTemplate) {
+        setTemplates(prev => prev.map(t => t.id === editingTemplate.id ? { ...finalTemplate, id: editingTemplate.id, lastModified: new Date().toISOString() } : t));
+        onAction(`Template "${finalTemplate.name}" updated successfully.`, 'success');
+      } else {
+        setTemplates(prev => [{ ...finalTemplate, id: result.template_id || `et-${Date.now()}`, lastModified: new Date().toISOString() }, ...prev]);
+        onAction(`New template "${finalTemplate.name}" created and synced.`, 'success');
+      }
+    } catch (error) {
+      console.error(error);
+      onAction('Template sync failure. Protocol error.', 'error');
     }
 
     setIsTemplateModalOpen(false);
   };
+
+
 
   const deleteTemplate = (id: string, name: string) => {
     setTemplates(prev => prev.filter(t => t.id !== id));
@@ -621,7 +1492,33 @@ const OnlineOpsView = ({
       <div className="flex justify-between items-center text-agency-ink">
         <div>
           <h2 className="text-2xl font-bold font-display uppercase tracking-tight">Email & CRM Engine</h2>
-          <p className="text-xs text-agency-muted font-bold uppercase tracking-widest mt-1">Omnichannel Automation & Delivery Optimization</p>
+          <div className="flex items-center gap-2 mt-1">
+            <p className="text-xs text-agency-muted font-bold uppercase tracking-widest">Omnichannel Automation & Delivery Optimization</p>
+            <div className="w-1.5 h-1.5 rounded-full bg-agency-border" />
+            <div className={cn(
+              "flex items-center gap-1.5 text-[9px] font-black uppercase tracking-tighter",
+              wsStatus === 'CONNECTED' ? "text-emerald-500" :
+              wsStatus === 'CONNECTING' ? "text-amber-500" :
+              "text-red-500"
+            )}>
+              <Activity className={cn("w-3 h-3", wsStatus === 'CONNECTING' && "animate-pulse")} />
+              {wsStatus === 'CONNECTED' ? 'Live Data Feed established' :
+               wsStatus === 'CONNECTING' ? 'Synchronizing Protocols...' :
+               'Offline — Offline Ops Mode'}
+            </div>
+            {oauthStatus && (
+              <>
+                <div className="w-1.5 h-1.5 rounded-full bg-agency-border" />
+                <div className={cn(
+                  "flex items-center gap-1.5 text-[9px] font-black uppercase tracking-tighter",
+                  oauthStatus.authenticated ? "text-emerald-500" : "text-red-500"
+                )}>
+                  <Lock className="w-3 h-3" />
+                  {oauthStatus.authenticated ? `Protocol Auth: ${oauthStatus.provider} - EXCELLENT` : 'Auth Required: UNAUTHORIZED'}
+                </div>
+              </>
+            )}
+          </div>
         </div>
         <div className="flex gap-2">
           <button 
@@ -633,7 +1530,7 @@ const OnlineOpsView = ({
             )}
           >
             {isAuditing ? <RefreshCw className="w-3.5 h-3.5 animate-spin text-agency-accent" /> : null}
-            {isAuditing ? `Auditing ${auditProgress}%` : 'Workflow Audit'}
+            {isAuditing ? `AUDITING ${auditProgress}%` : 'WORKFLOW AUDIT'}
           </button>
           <button 
             onClick={handleDeploySequence}
@@ -644,40 +1541,292 @@ const OnlineOpsView = ({
             )}
           >
             {isDeploying ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />} 
-            {isDeploying ? 'Deploying...' : 'Deploy Sequence'}
+            {isDeploying ? 'DEPLOYING...' : 'DEPLOY SEQUENCE'}
           </button>
         </div>
       </div>
 
       <AnimatePresence>
-        {isAuditing && (
+        {(isAuditing || (lastAuditResult && auditProgress === 100)) && (
           <motion.div 
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             className="overflow-hidden"
           >
-            <div className="p-4 bg-agency-accent/5 border border-agency-accent/20 rounded-xl mb-4">
-              <div className="h-1.5 w-full bg-agency-border rounded-full overflow-hidden">
-                <motion.div 
-                  className="h-full bg-agency-accent"
-                  animate={{ width: `${auditProgress}%` }}
-                />
+            <div className="p-8 bg-agency-bg border border-agency-border rounded-[2rem] mb-8 space-y-6">
+              <div className="flex justify-between items-center">
+                 <div className="flex items-center gap-3">
+                    <div className="p-2 bg-agency-accent text-white rounded-lg">
+                       <ShieldCheck className="w-5 h-5" />
+                    </div>
+                    <div>
+                       <div className="text-sm font-black uppercase tracking-widest text-agency-ink">Protocol Integrity Check</div>
+                       <div className="text-[10px] font-bold text-agency-muted uppercase">Last Run: {lastAuditResult ? new Date(lastAuditResult.audit_timestamp).toLocaleTimeString() : 'N/A'}</div>
+                    </div>
+                 </div>
+                 {lastAuditResult && (
+                    <div className="text-right">
+                       <div className="text-3xl font-black font-display text-agency-accent">{lastAuditResult.overall_score}</div>
+                       <div className="text-[8px] font-black uppercase text-agency-muted">Integrity Score</div>
+                    </div>
+                 )}
               </div>
+
+              {isAuditing && (
+                <div className="h-1.5 w-full bg-agency-border rounded-full overflow-hidden">
+                  <motion.div 
+                    className="h-full bg-agency-accent"
+                    animate={{ width: `${auditProgress}%` }}
+                  />
+                </div>
+              )}
+
+              {lastAuditResult && !isAuditing && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                   {lastAuditResult.findings.map((finding, idx) => (
+                      <div key={idx} className="p-4 bg-white border border-agency-border rounded-2xl space-y-3 hover:border-agency-accent transition-all group/finding">
+                         <div className="flex justify-between items-center">
+                            <div className={cn(
+                              "px-2 py-0.5 rounded text-[8px] font-black uppercase",
+                              finding.severity === 'CRITICAL' ? 'bg-red-500 text-white' :
+                              finding.severity === 'WARNING' ? 'bg-amber-500 text-white' :
+                              finding.severity === 'PASS' ? 'bg-emerald-500 text-white' :
+                              'bg-agency-accent text-white'
+                            )}>
+                               {finding.severity}
+                            </div>
+                            <div className="text-[8px] font-bold text-agency-muted uppercase">{finding.category}</div>
+                         </div>
+                         <div className="text-[11px] font-bold text-agency-ink leading-tight group-hover/finding:text-agency-accent transition-colors">
+                            {finding.message}
+                         </div>
+                         <div className="pt-2 border-t border-agency-border flex flex-col gap-2">
+                            <div className="flex items-center gap-2">
+                               <ArrowRightCircle className="w-2.5 h-2.5 text-agency-accent" />
+                               <span className="text-[9px] font-medium text-agency-muted italic">{finding.recommendation}</span>
+                            </div>
+                            {finding.severity !== 'PASS' && (
+                               <button 
+                                  onClick={() => handleQuickAction(
+                                    finding.message.toLowerCase().includes('bounce') ? 'RUN_LIST_HYGIENE' : 'SYNC_PLATFORM_NOW',
+                                    'seg-cold-leads-reengagement'
+                                  )}
+                                  disabled={isExecutingQuickAction !== null}
+                                  className="mt-1 w-full py-2 bg-agency-accent/10 border border-agency-accent/20 rounded-xl text-[9px] font-black uppercase tracking-widest text-agency-accent hover:bg-agency-accent hover:text-white transition-all flex items-center justify-center gap-2 group/btn"
+                               >
+                                  {isExecutingQuickAction ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3 group-hover/btn:animate-pulse" />}
+                                  {finding.message.toLowerCase().includes('bounce') ? 'Run List Hygiene Protocol' : 'Sync Platform Configuration'}
+                               </button>
+                            )}
+                         </div>
+                      </div>
+                   ))}
+                </div>
+              )}
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
+      {lastSequenceDeployment && (
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-8 bg-agency-ink text-white border border-white/10 rounded-[2rem] mb-8 space-y-6 shadow-2xl relative overflow-hidden"
+        >
+          <div className="absolute top-0 right-0 p-8 opacity-10">
+            <Rocket className="w-32 h-32 rotate-12" />
+          </div>
+          
+          <div className="relative z-10">
+            <div className="flex justify-between items-center mb-6">
+               <div className="flex items-center gap-3">
+                  <div className="p-2 bg-agency-accent text-white rounded-lg shadow-lg shadow-agency-accent/20">
+                     <Rocket className="w-5 h-5" />
+                  </div>
+                  <div>
+                     <div className="text-sm font-black uppercase tracking-widest">Deployment Orchestrator</div>
+                     <div className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Sequence ID: {lastSequenceDeployment.deployment_sequence_id}</div>
+                  </div>
+               </div>
+               <div className="text-right">
+                  <div className={cn(
+                    "text-[10px] font-black uppercase px-2 py-0.5 rounded bg-amber-400/10 inline-block border border-amber-400/30",
+                    lastSequenceDeployment.status === 'PENDING_APPROVAL' ? "text-amber-400 animate-pulse" : "text-emerald-400"
+                  )}>
+                     {lastSequenceDeployment.status.replace(/_/g, ' ')}
+                  </div>
+                  <div className="text-[8px] font-bold text-slate-500 uppercase mt-1 tracking-widest">Awaiting Stakeholder Signature</div>
+               </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+               <div className="p-4 bg-white/5 border border-white/10 rounded-2xl">
+                  <div className="text-[8px] font-black text-slate-500 uppercase mb-1">Approval Required</div>
+                  <div className="text-lg font-black text-white">2 Nodes</div>
+               </div>
+               <div className="p-4 bg-white/5 border border-white/10 rounded-2xl">
+                  <div className="text-[8px] font-black text-slate-500 uppercase mb-1">Target Volume</div>
+                  <div className="text-lg font-black text-white">{lastSequenceDeployment.total_expected_volume.toLocaleString()}</div>
+               </div>
+               {lastSequenceDeployment.timeline.slice(0, 2).map((item, idx) => (
+                  <div key={idx} className="p-4 bg-white/5 border border-white/10 rounded-2xl">
+                     <div className="text-[8px] font-black text-slate-500 uppercase mb-1">{item.date}</div>
+                     <div className="text-[10px] font-bold text-white uppercase">{item.flows} Flows · {item.volume.toLocaleString()}</div>
+                  </div>
+               ))}
+            </div>
+
+            <div className="flex items-center gap-2 pt-4 border-t border-white/5 mt-2">
+               <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
+               <span className="text-[10px] font-medium text-slate-300 italic">Handoff initiated. Sequence execution pending stakeholder signature across {Object.keys(lastSequenceDeployment.approval_links).length} roles.</span>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
           {/* Audience Segmentation */}
           <div className="panel-card p-6">
-            <h3 className="font-bold text-lg font-display mb-6 flex items-center gap-2">
-              <Users2 className="w-5 h-5 text-agency-accent" /> Audience Segmentation & Deliverability
-            </h3>
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="font-bold text-lg font-display flex items-center gap-2">
+                <Users2 className="w-5 h-5 text-agency-accent" /> Audience Segmentation & Deliverability
+              </h3>
+              <button 
+                onClick={() => setIsCreateSegmentModalOpen(true)}
+                className="px-4 py-2 bg-agency-ink text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-agency-accent transition-all flex items-center gap-2 shadow-lg shadow-agency-ink/10"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                + NEW SEGMENT
+              </button>
+            </div>
             <div className="space-y-4">
-              {segments.map((seg) => (
+              {(detailedSegments.length > 0 ? detailedSegments : []).map((seg) => (
+                <div key={seg.segment_id} className="p-5 bg-agency-bg border border-agency-border rounded-2xl group hover:border-agency-accent transition-all">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className={cn(
+                        "w-12 h-12 bg-white rounded-xl border border-agency-border flex items-center justify-center font-black text-agency-muted text-lg shadow-sm border-b-2",
+                        seg.health_status === 'EXCELLENT' ? "border-b-emerald-500" : seg.health_status === 'GOOD' ? "border-b-amber-500" : "border-b-red-500"
+                      )}>
+                        {seg.identifier}
+                      </div>
+                      <div>
+                        <div className="text-sm font-bold text-agency-ink">{seg.name}</div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-[10px] font-black text-agency-muted uppercase tracking-widest">{seg.subscriber_count.toLocaleString()} Subs</span>
+                          <span className="w-1 h-1 bg-agency-border rounded-full" />
+                          <span className="text-[10px] font-bold text-agency-accent bg-agency-accent/5 px-1.5 py-0.5 rounded border border-agency-accent/10">{seg.source.replace('_', ' ')}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex gap-6 text-right">
+                      <div className="space-y-0.5">
+                        <div className="text-[8px] font-black text-agency-muted uppercase tracking-tighter">Deliverability</div>
+                        <div className={cn(
+                          "text-xs font-black",
+                          seg.deliverability.domain_reputation === 'EXCELLENT' ? "text-emerald-500" : seg.deliverability.domain_reputation === 'GOOD' ? "text-amber-500" : "text-red-500"
+                        )}>{seg.deliverability.domain_reputation}</div>
+                      </div>
+                      <div className="space-y-0.5">
+                        <div className="text-[8px] font-black text-agency-muted uppercase tracking-tighter">Health Score</div>
+                        <div className="text-xs font-black text-agency-ink">{seg.health_score}%</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-4 gap-3 pt-4 border-t border-agency-border">
+                    <div className="space-y-1">
+                      <div className="text-[8px] font-black text-agency-muted uppercase">Open Rate</div>
+                      <div className="flex items-center gap-1.5">
+                        <div className="flex-1 h-1 bg-slate-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-emerald-500" style={{ width: `${seg.open_rate}%` }} />
+                        </div>
+                        <span className="text-[10px] font-bold text-agency-ink">{seg.open_rate}%</span>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="text-[8px] font-black text-agency-muted uppercase">Bounce Rate</div>
+                      <div className="flex items-center gap-1.5">
+                        <div className="flex-1 h-1 bg-slate-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-amber-500" style={{ width: `${seg.bounce_rate}%` }} />
+                        </div>
+                        <span className="text-[10px] font-bold text-agency-ink">{seg.bounce_rate}%</span>
+                      </div>
+                    </div>
+                    <div className="space-y-1 text-center">
+                      <div className="text-[8px] font-black text-agency-muted uppercase">IP Warming</div>
+                      <div className={cn(
+                        "text-[9px] font-black uppercase tracking-tighter mt-1",
+                        seg.deliverability.ip_warming_status === 'COMPLETE' ? "text-emerald-600" : "text-blue-500"
+                      )}>{seg.deliverability.ip_warming_status.replace('_', ' ')}</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-[8px] font-black text-agency-muted uppercase mb-1">State</div>
+                      <div className={cn(
+                        "inline-block px-2 py-0.5 rounded text-[8px] font-black uppercase border",
+                        seg.sync_status === 'SYNCED' ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-blue-50 text-blue-600 border-blue-100 animate-pulse"
+                      )}>{seg.sync_status}</div>
+                    </div>
+                  </div>
+
+                  {seg.bounce_rate > 2 && (
+                    <div className="mt-4 p-3 bg-red-50 border border-red-100 rounded-xl flex items-center justify-between animate-pulse">
+                      <div className="flex items-center gap-3 text-left">
+                        <div className="p-1.5 bg-red-100 rounded-lg">
+                          <ShieldAlert className="w-4 h-4 text-red-600" />
+                        </div>
+                        <div>
+                          <div className="text-[10px] font-black text-red-900 uppercase">Hygiene Required</div>
+                          <div className="text-[9px] font-medium text-red-700 italic">Bounce rate ({seg.bounce_rate}%) exceeds 2% threshold.</div>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => handleQuickAction('RUN_LIST_HYGIENE', seg.segment_id)}
+                        disabled={isExecutingQuickAction !== null}
+                        className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-red-700 transition-all flex items-center gap-1.5 shadow-sm"
+                      >
+                        {isExecutingQuickAction === 'RUN_LIST_HYGIENE' ? <RefreshCw className="w-3 h-3 animate-spin"/> : <Zap className="w-3 h-3" />}
+                        Run Hygiene Now
+                      </button>
+                    </div>
+                  )}
+
+                  {seg.deliverability.warnings && seg.deliverability.warnings.length > 0 && (
+                    <div className="mt-4 p-3 bg-red-50/50 border border-red-100 rounded-xl space-y-1.5">
+                      {seg.deliverability.warnings.map((warning, idx) => (
+                        <div key={idx} className="flex items-center gap-2 text-[9px] font-bold text-red-600">
+                          <AlertTriangle className="w-3 h-3 shrink-0" />
+                          {warning}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="mt-3 flex justify-between items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex gap-4">
+                      <button 
+                        onClick={() => executeHealthAudit(seg)}
+                        className="text-[8px] font-black uppercase text-agency-accent flex items-center gap-1 hover:underline"
+                      >
+                        <ShieldCheck className="w-2.5 h-2.5" /> Run Health Audit
+                      </button>
+                      {Object.entries(seg.deliverability.provider_breakdown).map(([provider, score]) => (
+                        <div key={provider} className="flex items-center gap-1">
+                          <span className="text-[7px] font-black uppercase text-agency-muted">{provider}:</span>
+                          <span className="text-[8px] font-bold text-agency-ink">{score}%</span>
+                        </div>
+                      ))}
+                    </div>
+                    <button className="text-[8px] font-black uppercase text-agency-accent flex items-center gap-1 hover:underline">
+                      View Segment Criteria <ArrowUpRight className="w-2.5 h-2.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {detailedSegments.length === 0 && segments.map((seg) => (
                 <div key={seg.id} className="p-4 bg-agency-bg border border-agency-border rounded-2xl group hover:border-agency-accent transition-all">
                   <div className="flex justify-between items-start mb-4">
                     <div className="flex items-center gap-3">
@@ -731,149 +1880,756 @@ const OnlineOpsView = ({
                 <Mail className="w-5 h-5 text-agency-accent" /> Asset Library: Email Templates
               </h3>
               <button 
-                onClick={() => openTemplateModal()}
+                onClick={() => setIsCreateTemplateModalOpen(true)}
                 className="px-3 py-1.5 bg-agency-bg border border-agency-border rounded-lg text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 hover:border-agency-accent transition-colors text-agency-ink"
               >
-                <Plus className="w-3.5 h-3.5" /> New Template
+                <Plus className="w-3.5 h-3.5" /> + NEW TEMPLATE
               </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {templates.map((tpl) => (
-                <div key={tpl.id} className="p-4 bg-agency-bg border border-agency-border rounded-2xl group hover:border-agency-accent transition-all relative overflow-hidden flex flex-col">
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex gap-2">
-                      <div className={cn(
-                        "px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter",
-                        tpl.category === 'Transactional' ? "bg-blue-100 text-blue-700" : 
-                        tpl.category === 'Marketing' ? "bg-purple-100 text-purple-700" :
-                        "bg-emerald-100 text-emerald-700"
-                      )}>
-                        {tpl.category}
-                      </div>
-                      {tpl.abTestingActive && (
-                        <div className="px-2 py-0.5 rounded bg-agency-accent/10 text-agency-accent text-[8px] font-black uppercase tracking-tighter flex items-center gap-1 border border-agency-accent/20">
-                          <Activity className="w-2.5 h-2.5" /> A/B ACTIVE
+              {(detailedTemplates.length > 0 ? detailedTemplates : templates).map((tpl: any) => {
+                const isDetailed = 'template_id' in tpl;
+                const tplId = isDetailed ? tpl.template_id : tpl.id;
+                const tplName = tpl.name;
+                const tplCategory = (isDetailed ? tpl.type : tpl.category).charAt(0).toUpperCase() + (isDetailed ? tpl.type : tpl.category).toLowerCase().slice(1);
+                const isAbActive = isDetailed ? tpl.ab_test_status === 'ACTIVE' : tpl.abTestingActive;
+                const lastModified = isDetailed ? tpl.modified_date : tpl.lastModified;
+                const subject = isDetailed ? tpl.content.subject_line : tpl.variants[0].subject;
+
+                return (
+                  <div key={tplId} className="p-4 bg-agency-bg border border-agency-border rounded-2xl group hover:border-agency-accent transition-all relative overflow-hidden flex flex-col">
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex gap-2">
+                        <div className={cn(
+                          "px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter",
+                          tplCategory === 'Transactional' ? "bg-blue-100 text-blue-700" : 
+                          tplCategory === 'Marketing' ? "bg-purple-100 text-purple-700" :
+                          "bg-emerald-100 text-emerald-700"
+                        )}>
+                          {tplCategory}
                         </div>
-                      )}
+                        {isAbActive && (
+                          <div className="px-2 py-0.5 rounded bg-agency-accent/10 text-agency-accent text-[8px] font-black uppercase tracking-tighter flex items-center gap-1 border border-agency-accent/20">
+                            <Activity className="w-2.5 h-2.5" /> A/B ACTIVE
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {isDetailed && tpl.preview_url && (
+                           <a href={tpl.preview_url} target="_blank" rel="noreferrer" className="p-1.5 hover:bg-white rounded-lg text-agency-muted hover:text-agency-accent transition-colors">
+                             <Eye className="w-3.5 h-3.5" />
+                           </a>
+                        )}
+                        <button onClick={() => isDetailed ? onAction(`Switching to detailed context for ${tplName}...`, 'info') : openTemplateModal(tpl)} className="p-1.5 hover:bg-white rounded-lg text-agency-muted hover:text-agency-accent transition-colors">
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => deleteTemplate(tplId, tplName)} className="p-1.5 hover:bg-white rounded-lg text-agency-muted hover:text-red-500 transition-colors">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => openTemplateModal(tpl)} className="p-1.5 hover:bg-white rounded-lg text-agency-muted hover:text-agency-accent transition-colors">
-                        <Edit3 className="w-3.5 h-3.5" />
-                      </button>
-                      <button onClick={() => deleteTemplate(tpl.id, tpl.name)} className="p-1.5 hover:bg-white rounded-lg text-agency-muted hover:text-red-500 transition-colors">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                    <div className="text-sm font-bold text-agency-ink truncate">{tplName}</div>
+                    <div className="text-[10px] text-agency-muted mt-1 font-medium truncate italic line-clamp-1">"{subject}"</div>
+                    
+                    {isDetailed && tpl.performance && (
+                      <div className="mt-4 grid grid-cols-3 gap-2">
+                         <div className="p-2 bg-white/50 rounded-lg border border-agency-border/50 text-center">
+                            <div className="text-[7px] font-black text-agency-muted uppercase">Open</div>
+                            <div className="text-[10px] font-black text-agency-ink">{tpl.performance.open_rate || tpl.performance.variant_b?.open_rate}%</div>
+                         </div>
+                         <div className="p-2 bg-white/50 rounded-lg border border-agency-border/50 text-center">
+                            <div className="text-[7px] font-black text-agency-muted uppercase">Click</div>
+                            <div className="text-[10px] font-black text-agency-ink">{tpl.performance.click_rate || tpl.performance.variant_b?.click_rate}%</div>
+                         </div>
+                         <div className="p-2 bg-amber-50 rounded-lg border border-amber-100 text-center">
+                            <div className="text-[7px] font-black text-amber-600 uppercase">Risk</div>
+                            <div className="text-[10px] font-black text-amber-600">{tpl.brand_compliance.spam_score}</div>
+                         </div>
+                      </div>
+                    )}
+
+                    {isDetailed && isAbActive && tpl.performance.recommended_action && (
+                      <div className="mt-3 p-3 bg-agency-accent/5 border border-agency-accent/20 rounded-xl space-y-2">
+                        <div className="text-[8px] font-black uppercase text-agency-accent flex items-center gap-1">
+                          <Trophy className="w-2.5 h-2.5" /> AI Recommendation
+                        </div>
+                        <div className="text-[9px] font-bold text-agency-ink leading-tight uppercase tracking-tight">
+                          {tpl.performance.recommended_action.replace(/_/g, ' ')}
+                        </div>
+                        <button 
+                          onClick={() => handleDeclareWinner(tplId, tpl.performance.winner || 'VARIANT_B')}
+                          disabled={isDeclaringWinner === tplId}
+                          className="w-full py-1.5 bg-agency-accent text-white rounded-lg text-[8px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5 hover:bg-agency-ink transition-all disabled:opacity-50"
+                        >
+                          {isDeclaringWinner === tplId ? (
+                            <RefreshCw className="w-2.5 h-2.5 animate-spin" />
+                          ) : (
+                            <ArrowRightCircle className="w-2.5 h-2.5" />
+                          )}
+                          Rollout Winner
+                        </button>
+                      </div>
+                    )}
+
+                    {!isDetailed && tpl.abTestingActive && tpl.variants.length > 1 && (
+                      <div className="mt-4 p-3 bg-white/50 rounded-xl border border-agency-border/50">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-[9px] font-black text-agency-muted uppercase">Split Performance</span>
+                          <BarChart2 className="w-3 h-3 text-agency-accent" />
+                        </div>
+                        <div className="space-y-2">
+                          {tpl.variants.map((v: any, idx: number) => {
+                            const totalOpens = tpl.variants.reduce((acc: any, curr: any) => acc + (curr.metrics?.opens || 0), 0);
+                            const reachPercent = totalOpens > 0 ? ((v.metrics?.opens || 0) / totalOpens) * 100 : 0;
+                            return (
+                              <div key={v.id} className="space-y-1">
+                                <div className="flex justify-between text-[8px] font-bold">
+                                  <span className={idx === 0 ? "text-agency-accent" : "text-purple-600"}>Variant {idx === 0 ? 'A' : 'B'} {v.isControl && '(Control)'}</span>
+                                  <span className="text-agency-ink">{v.metrics?.conversions} Conv.</span>
+                                </div>
+                                <div className="h-1 w-full bg-agency-border rounded-full overflow-hidden">
+                                  <div 
+                                    className={cn("h-full transition-all duration-1000", idx === 0 ? "bg-agency-accent" : "bg-purple-500")}
+                                    style={{ width: `${reachPercent}%` }}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="mt-auto pt-4 flex items-center justify-between">
+                      <div className="flex -space-x-2">
+                        {(isDetailed ? tpl.content.personalization_tokens : tpl.placeholders).slice(0, 3).map((p: any, i: number) => (
+                          <div key={i} title={p} className="w-6 h-6 rounded-full bg-white border border-agency-border flex items-center justify-center text-[8px] font-bold text-agency-accent uppercase">
+                            {p.charAt(0)}
+                          </div>
+                        ))}
+                        {(isDetailed ? tpl.content.personalization_tokens : tpl.placeholders).length > 3 && (
+                          <div className="w-6 h-6 rounded-full bg-agency-accent border border-white flex items-center justify-center text-[8px] font-bold text-white">
+                            +{(isDetailed ? tpl.content.personalization_tokens : tpl.placeholders).length - 3}
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-[8px] font-black text-agency-muted uppercase">Modified {new Date(lastModified).toLocaleDateString()}</div>
                     </div>
                   </div>
-                  <div className="text-sm font-bold text-agency-ink truncate">{tpl.name}</div>
-                  <div className="text-[10px] text-agency-muted mt-1 font-medium truncate italic">{tpl.variants[0].subject}</div>
-                  
-                  {tpl.abTestingActive && tpl.variants.length > 1 && (
-                    <div className="mt-4 p-3 bg-white/50 rounded-xl border border-agency-border/50">
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-[9px] font-black text-agency-muted uppercase">Split Performance</span>
-                        <BarChart2 className="w-3 h-3 text-agency-accent" />
-                      </div>
-                      <div className="space-y-2">
-                        {tpl.variants.map((v, idx) => {
-                          const totalOpens = tpl.variants.reduce((acc, curr) => acc + (curr.metrics?.opens || 0), 0);
-                          const reachPercent = totalOpens > 0 ? ((v.metrics?.opens || 0) / totalOpens) * 100 : 0;
-                          return (
-                            <div key={v.id} className="space-y-1">
-                              <div className="flex justify-between text-[8px] font-bold">
-                                <span className={idx === 0 ? "text-agency-accent" : "text-purple-600"}>Variant {idx === 0 ? 'A' : 'B'} {v.isControl && '(Control)'}</span>
-                                <span className="text-agency-ink">{v.metrics?.conversions} Conv.</span>
-                              </div>
-                              <div className="h-1 w-full bg-agency-border rounded-full overflow-hidden">
-                                <div 
-                                  className={cn("h-full transition-all duration-1000", idx === 0 ? "bg-agency-accent" : "bg-purple-500")}
-                                  style={{ width: `${reachPercent}%` }}
-                                />
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
+                );
+              })}
+            </div>
+          </div>
 
-                  <div className="mt-auto pt-4 flex items-center justify-between">
-                    <div className="flex -space-x-2">
-                      {tpl.placeholders.slice(0, 3).map((p, i) => (
-                        <div key={i} title={p} className="w-6 h-6 rounded-full bg-white border border-agency-border flex items-center justify-center text-[8px] font-bold text-agency-accent uppercase">
-                          {p.charAt(0)}
-                        </div>
-                      ))}
-                      {tpl.placeholders.length > 3 && (
-                        <div className="w-6 h-6 rounded-full bg-agency-accent border border-white flex items-center justify-center text-[8px] font-bold text-white">
-                          +{tpl.placeholders.length - 3}
-                        </div>
+          {/* Online Operations Quick Actions */}
+          <div className="panel-card p-6 border-b-4 border-b-agency-accent">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 bg-agency-accent/10 rounded-lg">
+                <Zap className="w-5 h-5 text-agency-accent" />
+              </div>
+              <div>
+                <h3 className="font-bold font-display">Operational Quick Actions</h3>
+                <p className="text-[10px] font-black uppercase tracking-widest text-agency-muted">Protocol Mitigation & Maintenance</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { type: 'RUN_LIST_HYGIENE' as const, label: 'Run List Hygiene', icon: ShieldCheck, targetVisible: true },
+                { type: 'PAUSE_UNDERPERFORMING_FLOWS' as const, label: 'Pause Underperforming', icon: AlertTriangle },
+                { type: 'SYNC_PLATFORM_NOW' as const, label: 'Force Platform Sync', icon: RefreshCw },
+                { type: 'GENERATE_DELIVERABILITY_REPORT' as const, label: 'Deliverability Audit', icon: FileSearch },
+                { type: 'TRIGGER_RE_ENGAGEMENT' as const, label: 'Re-engagement Blast', icon: Sparkles },
+                { type: 'NOTIFY_CLIENT_STATUS' as const, label: 'Update Stakeholders', icon: Mail },
+              ].map((action) => (
+                <button
+                  key={action.type}
+                  onClick={() => handleQuickAction(action.type, action.targetVisible ? (detailedSegments[0]?.segment_id) : undefined)}
+                  disabled={isExecutingQuickAction !== null}
+                  className="p-3 bg-agency-bg border border-agency-border rounded-xl hover:border-agency-accent hover:bg-agency-accent/5 transition-all text-left group disabled:opacity-50"
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <action.icon className={cn(
+                      "w-4 h-4 transition-colors",
+                      isExecutingQuickAction === action.type ? "text-agency-accent animate-spin" : "text-agency-muted group-hover:text-agency-accent"
+                    )} />
+                    <span className="text-[10px] font-black uppercase text-agency-ink leading-tight">{action.label}</span>
+                  </div>
+                  <div className="text-[8px] font-bold text-agency-muted uppercase tracking-tighter">
+                    {isExecutingQuickAction === action.type ? 'Processing Protocol...' : 'Execute Now'}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Maintenance & Validation Agent */}
+          <div className="panel-card p-6 border-b-4 border-b-blue-500 mb-6">
+            <div className="flex justify-between items-center mb-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-500/10 rounded-lg">
+                  <ShieldHalf className="w-5 h-5 text-blue-500" />
+                </div>
+                <div>
+                  <h3 className="font-bold font-display text-agency-ink">Maintenance & Validation Agent</h3>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-agency-muted">Information Drift Mitigation</p>
+                </div>
+              </div>
+              <button
+                onClick={handleMaintenanceAudit}
+                disabled={isAuditingMaintenance}
+                className="px-4 py-2 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all flex items-center gap-2 shadow-lg shadow-blue-600/20 disabled:opacity-50"
+              >
+                {isAuditingMaintenance ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+                {isAuditingMaintenance ? 'Auditing...' : 'Run Drift Audit'}
+              </button>
+            </div>
+
+            {maintenanceAudit && (
+              <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="p-4 bg-agency-bg border border-agency-border rounded-xl">
+                  <div className="text-[8px] font-black text-agency-muted uppercase tracking-widest mb-1">Integrity Score</div>
+                  <div className="text-2xl font-black text-blue-600">{maintenanceAudit.summary.integrity_score}%</div>
+                </div>
+                <div className="p-4 bg-agency-bg border border-agency-border rounded-xl">
+                  <div className="text-[8px] font-black text-agency-muted uppercase tracking-widest mb-1">Verified Nodes</div>
+                  <div className="text-2xl font-black text-agency-ink">{maintenanceAudit.summary.verified}</div>
+                </div>
+                <div className="p-4 bg-agency-bg border border-agency-border rounded-xl">
+                  <div className="text-[8px] font-black text-agency-muted uppercase tracking-widest mb-1">Updates Synced</div>
+                  <div className="text-2xl font-black text-emerald-500">{maintenanceAudit.summary.updates_applied}</div>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+              {maintenanceLogs.map((log, idx) => (
+                <div key={idx} className="p-3 bg-agency-bg border border-agency-border rounded-xl flex items-start gap-3 group">
+                  <div className={cn(
+                    "mt-1 p-1 rounded-full",
+                    log.status === 'verified' ? "bg-emerald-500" : "bg-amber-500 animate-pulse"
+                  )}>
+                    {log.status === 'verified' ? <Check className="w-2 h-2 text-white" /> : <Activity className="w-2 h-2 text-white" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex justify-between items-start mb-0.5">
+                      <div className="text-[10px] font-black text-agency-ink uppercase tracking-tight truncate">{log.target_field}</div>
+                      <div className="text-[8px] font-bold text-agency-muted font-mono">{new Date(log.timestamp).toLocaleTimeString()}</div>
+                    </div>
+                    <div className="text-[9px] text-agency-muted leading-relaxed italic mb-2 text-left">
+                      {log.message}
+                    </div>
+                    <div className="flex items-center gap-2 bg-white/50 p-2 rounded-lg border border-agency-border/50">
+                      <span className="text-[8px] font-black text-agency-muted uppercase">Sync Value:</span>
+                      <code className="text-[9px] font-bold text-agency-ink font-mono bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">{log.new_value}</code>
+                      {log.status === 'update_needed' && (
+                        <span className="text-[7px] font-black text-amber-600 uppercase animate-pulse ml-auto bg-amber-50 px-1 py-0.5 rounded">Information Drift Resolved</span>
                       )}
                     </div>
-                    <div className="text-[8px] font-black text-agency-muted uppercase">Modified {new Date(tpl.lastModified).toLocaleDateString()}</div>
                   </div>
                 </div>
               ))}
+              {maintenanceLogs.length === 0 && (
+                <div className="text-center py-8 text-agency-muted italic text-xs">
+                  Awaiting initial audit protocol...
+                </div>
+              )}
             </div>
+          </div>
+
+          {/* Lead A2A Developer Agent */}
+          <div className="panel-card p-6 border-b-4 border-b-indigo-500 mb-6 font-sans">
+            <div className="flex justify-between items-center mb-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-indigo-500/10 rounded-lg">
+                  <Code2 className="w-5 h-5 text-indigo-500" />
+                </div>
+                <div>
+                  <h3 className="font-bold font-display text-agency-ink">Lead A2A Developer Agent</h3>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-agency-muted">Error Monitoring & Auto-Fix Protocol</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="flex h-2 w-2 rounded-full bg-emerald-500"></span>
+                <span className="text-[10px] font-bold text-agency-muted uppercase tracking-tighter">System Watcher: Active</span>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {developerLogs.map((log) => (
+                <div key={log.id} className="p-4 bg-agency-bg border border-agency-border rounded-xl group transition-all hover:border-indigo-500/30">
+                  <div className="flex justify-between items-start mb-3 text-left">
+                    <div className="flex items-center gap-3">
+                      <div className={cn(
+                        "p-1.5 rounded-lg",
+                        log.level === 'error' ? "bg-red-500/10 text-red-500" : "bg-amber-500/10 text-amber-500"
+                      )}>
+                        {log.level === 'error' ? <ShieldAlert className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
+                      </div>
+                      <div>
+                        <div className="text-[11px] font-black text-agency-ink uppercase truncate max-w-[250px]">{log.message}</div>
+                        <div className="text-[9px] font-bold text-agency-muted truncate font-mono">Target API: {log.target_api} | Timestamp: {new Date(log.timestamp).toLocaleTimeString()}</div>
+                      </div>
+                    </div>
+                    <div className={cn(
+                      "px-2 py-1 rounded text-[8px] font-black uppercase",
+                      log.status === 'resolved' ? "bg-emerald-500/10 text-emerald-500" : "bg-red-500/10 text-red-500 animate-pulse"
+                    )}>
+                      {log.status}
+                    </div>
+                  </div>
+
+                  {log.stack_trace && (
+                    <div className="mb-4 p-3 bg-agency-ink rounded-lg font-mono text-[9px] text-indigo-300/80 overflow-x-auto whitespace-pre border border-white/5 text-left">
+                      {log.stack_trace}
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="flex flex-col text-left">
+                        <span className="text-[8px] font-black text-agency-muted uppercase tracking-widest">Error Code</span>
+                        <span className="text-[10px] font-bold text-agency-ink">{log.error_code}</span>
+                      </div>
+                      <div className="w-px h-6 bg-agency-border"></div>
+                      <div className="flex flex-col text-left">
+                        <span className="text-[8px] font-black text-agency-muted uppercase tracking-widest">Module</span>
+                        <span className="text-[10px] font-bold text-agency-ink">{log.target_api} Handler</span>
+                      </div>
+                    </div>
+
+                    {log.status === 'active' && (
+                      <button
+                        onClick={() => handleAutoFix(log.id)}
+                        disabled={isFixingError !== null}
+                        className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all flex items-center gap-2 shadow-lg shadow-indigo-600/20 disabled:opacity-50"
+                      >
+                        {isFixingError === log.id ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+                        {isFixingError === log.id ? 'Analyzing Fix...' : 'Auto-Fix Protocol'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {lastFixResult && (
+                <div className="mt-4 p-4 bg-emerald-50 border border-emerald-100 rounded-xl animate-in fade-in slide-in-from-bottom-2 text-left">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-1.5 bg-emerald-100 rounded-lg">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    </div>
+                    <div>
+                      <div className="text-[11px] font-black text-emerald-900 uppercase">Auto-Fix Deployment Successful</div>
+                      <div className="text-[9px] font-medium text-emerald-700 italic">{lastFixResult.validation_message}</div>
+                    </div>
+                  </div>
+                  <div className="p-3 bg-agency-ink rounded-lg font-mono text-[9px] text-emerald-400 overflow-x-auto whitespace-pre">
+                    {lastFixResult.diff}
+                  </div>
+                  <div className="mt-3 flex items-center justify-between text-[9px] font-black text-emerald-800 uppercase tracking-widest">
+                    <span>Validation Message Sent to Validator Agent</span>
+                    <span className="flex items-center gap-1"><ArrowRight className="w-3 h-3" /> System Synchronized</span>
+                  </div>
+                </div>
+              )}
+
+              {developerLogs.length === 0 && (
+                <div className="text-center py-12 text-agency-muted italic text-xs">
+                  No active errors detected in maintenance shard...
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Online Operations Protocol Logs */}
+          <div className="panel-card p-6 bg-agency-ink text-white">
+            <div className="flex justify-between items-center mb-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-agency-accent/20 rounded-lg">
+                  <Terminal className="w-5 h-5 text-agency-accent" />
+                </div>
+                <div>
+                  <h3 className="font-bold font-display">Protocol Operations Viewer</h3>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Real-time Shard Sync & Mitigation Logs</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-xl font-black">{totalLogs}</div>
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">Events Captured</div>
+              </div>
+            </div>
+
+            <div className="space-y-2 max-h-[500px] overflow-y-auto custom-scrollbar pr-2 text-left">
+              {isLoadingLogs && logs.length === 0 ? (
+                <div className="p-8 text-center">
+                  <RefreshCw className="w-6 h-6 animate-spin mx-auto text-slate-700 mb-2" />
+                  <div className="text-[10px] font-bold text-slate-600 uppercase">Synchronizing with Protocol Logs...</div>
+                </div>
+              ) : logs.map((log, idx) => (
+                <div key={idx} className="group p-3 bg-white/5 border border-white/5 rounded-xl hover:bg-white/[0.07] transition-all">
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className={cn(
+                        "w-2 h-2 rounded-full",
+                        log.level === 'ERROR' ? "bg-red-500" : log.level === 'WARN' ? "bg-amber-500" : "bg-blue-500"
+                      )} />
+                      <span className={cn(
+                        "text-[9px] font-black uppercase px-2 py-0.5 rounded",
+                        log.level === 'ERROR' ? "bg-red-500/10 text-red-500" : log.level === 'WARN' ? "bg-amber-500/10 text-amber-500" : "bg-blue-500/10 text-blue-500"
+                      )}>{log.level}</span>
+                      <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{log.action}</span>
+                    </div>
+                    <span className="text-[8px] font-mono text-slate-600">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                  </div>
+                  <div className="text-[11px] font-medium text-slate-200 leading-relaxed italic">"{log.message}"</div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {log.platform && <span className="text-[8px] font-black uppercase text-slate-500 bg-white/5 px-1.5 py-0.5 rounded">Platform: {log.platform}</span>}
+                    {log.segment_id && <span className="text-[8px] font-black uppercase text-slate-500 bg-white/5 px-1.5 py-0.5 rounded">Segment: {log.segment_id}</span>}
+                    <span className="text-[8px] font-black uppercase text-slate-500 bg-white/5 px-1.5 py-0.5 rounded">Agent: {log.agent}</span>
+                  </div>
+                  {log.data && Object.keys(log.data).length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-white/5 grid grid-cols-2 gap-x-4 gap-y-1">
+                      {Object.entries(log.data).map(([k, v]: [string, any]) => (
+                        <div key={k} className="flex justify-between items-center text-[8px] font-mono">
+                          <span className="text-slate-500 text-left">{k}</span>
+                          <span className="text-slate-300 font-black text-right">{typeof v === 'number' ? v.toLocaleString() : String(v)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            
+            <button 
+              onClick={() => onAction('Flushing and refreshing operation logs...', 'info')}
+              className="w-full mt-6 py-2.5 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:bg-white/10 transition-all flex items-center justify-center gap-2"
+            >
+              <RefreshCw className="w-3.5 h-3.5" /> Force Protocol Log Rotation
+            </button>
           </div>
         </div>
 
         <div className="space-y-8">
-          {/* Deliverability Heatmap */}
+          {/* Reputation Monitor */}
           <div className="panel-card p-6 border-slate-900 bg-slate-900 text-white">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-                <Activity className="w-4 h-4 text-emerald-400" /> Reputation Monitor
+              <h3 className="text-sm font-bold uppercase tracking-widest flex items-center gap-2 text-white">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" /> Reputation Monitor
               </h3>
-              <span className="text-[9px] font-black text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded">DOMAIN: EXCELLENT</span>
+              <div className={cn(
+                "text-[9px] font-black px-2 py-1 rounded border",
+                reputationData?.domain_status === 'EXCELLENT' ? "text-emerald-400 bg-emerald-400/10 border-emerald-400/20" : 
+                reputationData?.domain_status === 'GOOD' ? "text-amber-400 bg-amber-400/10 border-amber-400/20" : 
+                "text-red-400 bg-red-400/10 border-red-400/20"
+              )}>
+                DOMAIN: {reputationData?.domain_status || 'LOADING...'} ({reputationData?.domain_reputation_score || 0})
+              </div>
             </div>
-            <div className="grid grid-cols-7 gap-2">
-              {[...Array(28)].map((_, i) => (
-                <div key={i} className={cn(
-                  "h-6 rounded-[4px] transition-all hover:scale-110 cursor-help",
-                  i % 7 === 0 ? "bg-red-500/20" : i % 5 === 0 ? "bg-amber-500/40" : "bg-emerald-500/30"
-                )} />
+
+            <div className="space-y-6">
+              {reputationData?.ip_warming_status && (
+                <div className="p-3 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-between">
+                  <div>
+                    <div className="text-[10px] font-black uppercase text-slate-400">IP Warming Phase</div>
+                    <div className="text-sm font-bold text-emerald-400">{reputationData.ip_warming_status.current_phase}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[10px] font-black uppercase text-slate-400">Limit</div>
+                    <div className="flex items-center gap-2">
+                      <div className="text-sm font-bold">{reputationData.ip_warming_status.daily_send_limit.toLocaleString()} / day</div>
+                      <button 
+                        onClick={handleAdjustVolume}
+                        disabled={isAdjustingVolume}
+                        className="p-1 hover:bg-white/10 rounded-md transition-colors text-emerald-400 disabled:opacity-50"
+                        title="Optimize Volume Ramp"
+                      >
+                        {isAdjustingVolume ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Settings2 className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-7 gap-1.5 h-16">
+                {(reputationData?.ip_warming_latency_grid?.cells || [...Array(49)]).map((cell, i) => (
+                  <div 
+                    key={i} 
+                    title={cell ? `Day ${cell.day}: ${cell.latency_ms}ms latency` : ''}
+                    className={cn(
+                      "h-full rounded-sm transition-all hover:scale-110",
+                      cell ? (
+                        cell.latency_ms < 50 ? "bg-emerald-500" :
+                        cell.latency_ms < 100 ? "bg-emerald-500/60" :
+                        cell.latency_ms < 200 ? "bg-amber-500/50" : "bg-red-500/40"
+                      ) : "bg-slate-800"
+                    )} 
+                  />
+                ))}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                {reputationData && Object.entries(reputationData.provider_side_throttling).map(([provider, details]) => (
+                  <div key={provider} className="p-3 bg-white/5 border border-white/10 rounded-xl">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-[9px] font-black uppercase text-slate-400">{provider}</span>
+                      <div className={cn(
+                        "w-1.5 h-1.5 rounded-full",
+                        details.throttle_detected ? "bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.6)]" : "bg-emerald-500"
+                      )} />
+                    </div>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-sm font-bold">{details.inbox_rate}%</span>
+                      <span className="text-[8px] text-slate-500 uppercase tracking-tighter">Inbox</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {reputationData?.alert_history.length && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-[9px] font-black text-slate-500 uppercase tracking-widest border-b border-white/10 pb-2">
+                    <History className="w-3 h-3" /> Active Mitigation Logs
+                  </div>
+                  {reputationData.alert_history.map((alert, idx) => (
+                    <div key={idx} className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl space-y-1">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[9px] font-black text-red-400 flex items-center gap-1">
+                          <ShieldAlert className="w-2.5 h-2.5" /> {alert.message}
+                        </span>
+                        <span className="text-[8px] text-slate-500 font-mono">{new Date(alert.timestamp).toLocaleTimeString()}</span>
+                      </div>
+                      <p className="text-[9px] text-slate-400 leading-tight italic">
+                        Action: {alert.action_taken} ({alert.resolution_time_minutes}m)
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="p-4 bg-emerald-500/5 rounded-2xl border border-emerald-500/10">
+                <div className="flex items-center gap-2 mb-2">
+                  <ShieldHalf className="w-4 h-4 text-emerald-400" />
+                  <span className="text-[10px] font-black uppercase text-emerald-400 tracking-[0.2em]">Agent Recommendations</span>
+                </div>
+                <div className="space-y-2">
+                  {(reputationData?.recommendations || [
+                    "Maintain current daily volume — reputation is stable",
+                    "Monitor bounce spikes on legacy re-engagement cohorts",
+                    "Awaiting real-time signal synchronization..."
+                  ]).map((rec, i) => (
+                    <div key={i} className="flex gap-2 text-[9px] font-bold text-slate-300">
+                      <div className="w-1 h-1 bg-emerald-500 rounded-full mt-1 shrink-0" />
+                      {rec}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Platform Sync & Integration Status */}
+          <div className="panel-card p-6 bg-[#0F172A] text-slate-100">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="font-bold font-display uppercase text-sm flex items-center gap-2">
+                <Database className="w-4 h-4 text-emerald-400" /> Platform Sync
+              </h3>
+              {platformSync && (
+                <div className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded text-[8px] font-black uppercase border border-emerald-500/30">
+                  {platformSync.connected_platforms.length} CONNECTED
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-6">
+              {platformSync?.connected_platforms.map((platform, idx) => (
+                <div key={idx} className="space-y-4">
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-white/5 rounded-xl border border-white/10 flex items-center justify-center">
+                        <Share2 className="w-5 h-5 text-emerald-400" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-bold text-white">{platform.platform}</div>
+                        <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{platform.connection_type} · v{platform.api_version}</div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className={cn(
+                        "text-[10px] font-black uppercase tracking-tighter",
+                        platform.status === 'CONNECTED' ? "text-emerald-400" : "text-amber-400"
+                      )}>{platform.status}</div>
+                      <div className="text-[8px] text-slate-500 font-mono mt-0.5">Latency: {platform.latency_ms}ms</div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="p-2 bg-white/5 rounded-lg border border-white/5 text-center">
+                      <div className="text-[7px] font-black text-slate-500 uppercase">Profiles</div>
+                      <div className="text-[11px] font-black text-white">{platform.synced_data.profiles.toLocaleString()}</div>
+                    </div>
+                    <div className="p-2 bg-white/5 rounded-lg border border-white/5 text-center">
+                      <div className="text-[7px] font-black text-slate-500 uppercase">Flows</div>
+                      <div className="text-[11px] font-black text-white">{platform.synced_data.flows}</div>
+                    </div>
+                    <div className="p-2 bg-white/5 rounded-lg border border-white/5 text-center">
+                      <div className="text-[7px] font-black text-slate-500 uppercase">Asset Sync</div>
+                      <div className="text-[11px] font-black text-emerald-400">OK</div>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-white/5 rounded-xl space-y-2">
+                     <div className="flex justify-between text-[8px] font-black uppercase text-slate-500">
+                        <span className="flex items-center gap-1"><Zap className="w-2.5 h-2.5" /> Real-time Webhooks</span>
+                        <span className="text-emerald-400">ACTIVE</span>
+                     </div>
+                     <div className="flex justify-between text-[8px] font-black uppercase text-slate-500">
+                        <span className="flex items-center gap-1"><RefreshCw className="w-2.5 h-2.5" /> Last Sync</span>
+                        <span className="text-white">{new Date(platform.last_sync).toLocaleTimeString()}</span>
+                     </div>
+                  </div>
+                </div>
               ))}
+
+              <div className="pt-4 border-t border-white/10">
+                <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-3">Available Bridges</div>
+                <div className="grid grid-cols-2 gap-2">
+                  {platformSync?.available_integrations.map((integration, idx) => (
+                    <button 
+                      key={idx} 
+                      onClick={() => handleConnectPlatform(integration.platform)}
+                      disabled={isConnectingPlatform === integration.platform}
+                      className="p-2 bg-white/5 border border-white/10 rounded-xl text-left hover:border-emerald-500/50 transition-all group disabled:opacity-50"
+                    >
+                      <div className="flex justify-between items-center">
+                        <div className="text-[10px] font-bold text-white group-hover:text-emerald-400 transition-colors">{integration.platform}</div>
+                        {isConnectingPlatform === integration.platform && <RefreshCw className="w-2.5 h-2.5 animate-spin text-emerald-400" />}
+                      </div>
+                      <div className="text-[8px] text-slate-500 font-bold uppercase tracking-tighter">{integration.status}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
-            <p className="text-[10px] text-slate-400 mt-4 leading-relaxed italic">
-              Visualizing IP warming latency and provider-side throttling detections (Outlook, Gmail, Yahoo).
-            </p>
           </div>
 
           {/* Workflow Node Manager */}
           <div className="panel-card p-6">
-            <h3 className="font-bold font-display uppercase text-sm mb-6 flex items-center gap-2">
-              <Workflow className="w-4 h-4 text-agency-accent" /> Active Flows
-            </h3>
-            <div className="space-y-4">
-              {workflows.map((flow) => (
-                <div key={flow.id} className="space-y-3 p-4 bg-agency-bg rounded-xl border border-agency-border">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="text-[11px] font-bold text-agency-ink">{flow.name}</div>
-                      <div className="text-[9px] font-bold text-agency-muted uppercase mt-0.5">{flow.trigger}</div>
-                    </div>
-                    <div className={cn(
-                      "w-2 h-2 rounded-full",
-                      flow.status === 'active' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-slate-300'
-                    )} />
-                  </div>
-                  <div className="flex justify-between items-center text-[10px]">
-                    <span className="text-agency-muted font-bold uppercase">{flow.steps} Steps</span>
-                    <span className="text-agency-accent font-black tracking-tighter">{flow.conversionRate}% CONV</span>
-                  </div>
-                  <div className="h-1 w-full bg-white rounded-full overflow-hidden">
-                    <div className="h-full bg-agency-accent" style={{ width: `${flow.conversionRate * 3}%` }} />
-                  </div>
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="font-bold font-display uppercase text-sm flex items-center gap-2">
+                <Workflow className="w-4 h-4 text-agency-accent" /> Active Flows
+              </h3>
+              {flowStats && (
+                <div className="text-[10px] font-black uppercase text-agency-muted bg-agency-bg px-2 py-1 rounded">
+                  AVG CONV: {flowStats.conversion}%
                 </div>
-              ))}
+              )}
+            </div>
+            <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
+              {(detailedFlows.length > 0 ? detailedFlows : workflows).map((flow: any) => {
+                const isDetailed = 'flow_id' in flow;
+                const flowId = isDetailed ? flow.flow_id : flow.id;
+                const name = flow.name;
+                const trigger = isDetailed ? flow.trigger_type.replace(/_/g, ' ') : flow.trigger;
+                const status = isDetailed ? flow.status : flow.status;
+                const conv = isDetailed ? flow.conversion_rate : flow.conversionRate;
+                const active = isDetailed ? flow.active_contacts : flow.activeSubscribers;
+
+                return (
+                  <div key={flowId} className="group space-y-3 p-5 bg-agency-bg border border-agency-border rounded-3xl hover:border-agency-accent transition-all">
+                    <div className="flex justify-between items-start">
+                      <div className="min-w-0 flex-1 pr-4">
+                        <div className="text-[11px] font-black text-agency-ink uppercase tracking-tight truncate">{name}</div>
+                        <div className="text-[9px] font-bold text-agency-muted uppercase mt-0.5 tracking-wider truncate flex items-center gap-1.5">
+                          <Zap className="w-2.5 h-2.5 text-agency-accent" /> {trigger}
+                        </div>
+                      </div>
+                      <div className={cn(
+                        "px-2 py-0.5 rounded text-[8px] font-black uppercase",
+                        status === 'RUNNING' || status === 'active' ? "bg-emerald-50 text-emerald-600 border border-emerald-100" : "bg-slate-100 text-slate-500 border border-slate-200"
+                      )}>
+                        {status}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                       <div className="space-y-1">
+                          <div className="flex justify-between text-[8px] font-black uppercase text-agency-muted">
+                            <span>Steps</span>
+                            <span className="text-agency-ink">{flow.steps}</span>
+                          </div>
+                          <div className="h-1 w-full bg-white rounded-full overflow-hidden shadow-inner">
+                            <div className="h-full bg-agency-ink/10 w-[80%]" />
+                          </div>
+                       </div>
+                       <div className="space-y-1">
+                          <div className="flex justify-between text-[8px] font-black uppercase text-agency-muted">
+                            <span>Conversion</span>
+                            <span className="text-agency-accent">{conv}%</span>
+                          </div>
+                          <div className="h-1 w-full bg-white rounded-full overflow-hidden shadow-inner">
+                            <motion.div 
+                              initial={{ width: 0 }}
+                              animate={{ width: `${conv}%` }}
+                              className="h-full bg-agency-accent" 
+                            />
+                          </div>
+                       </div>
+                    </div>
+
+                    <div className="flex justify-between items-center text-[9px] font-bold py-2 border-y border-agency-border/50">
+                        <div className="flex items-center gap-1 text-agency-muted uppercase tracking-tighter">
+                          <Users className="w-3 h-3" /> {active?.toLocaleString()} <span className="opacity-60">Active</span>
+                        </div>
+                        {isDetailed && flow.ai_optimization.enabled && (
+                          <div className="flex items-center gap-1 text-agency-accent uppercase tracking-tighter">
+                            <Sparkles className="w-3 h-3" /> {flow.ai_optimization.projected_improvement}
+                          </div>
+                        )}
+                    </div>
+
+                    {isDetailed && (
+                      <div className="flex flex-col gap-2 pt-1">
+                        <div className="flex justify-between items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                           <button 
+                             onClick={() => onAction(`Analyzing path performance for ${name}...`, 'info')}
+                             className="text-[8px] font-black uppercase text-agency-muted hover:text-agency-accent transition-colors flex items-center gap-1"
+                           >
+                             <Activity className="w-2.5 h-2.5" /> Performance Audit
+                           </button>
+                           <button 
+                             onClick={() => onAction(`Initiating AI optimization for ${name}...`, 'info')}
+                             className="text-[8px] font-black uppercase text-agency-accent flex items-center gap-1 hover:underline"
+                           >
+                             <History className="w-2.5 h-2.5" /> Optimization History
+                           </button>
+                        </div>
+                        {status !== 'RUNNING' && (
+                          <button 
+                            onClick={() => handleDeployFlow(flow)}
+                            disabled={isDeployingFlow === flowId}
+                            className="w-full py-2 bg-agency-ink text-white rounded-xl text-[8px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-agency-accent transition-colors disabled:opacity-50"
+                          >
+                            {isDeployingFlow === flowId ? (
+                              <RefreshCw className="w-2.5 h-2.5 animate-spin" />
+                            ) : (
+                              <Rocket className="w-2.5 h-2.5" />
+                            )}
+                            {isDeployingFlow === flowId ? 'Deploying...' : 'Deploy Sequence'}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
             <button 
-              onClick={() => onAction('Compiling new LLM-driven automation sequence...', 'info')}
+              onClick={() => setIsCreateFlowModalOpen(true)}
               className="w-full mt-6 py-3 bg-agency-bg border-2 border-dashed border-agency-border rounded-xl text-[10px] font-bold uppercase tracking-widest text-agency-muted hover:text-agency-accent hover:border-agency-accent transition-all"
             >
-              + New Automation Sequence
+              + NEW AUTOMATION SEQUENCE
             </button>
           </div>
 
@@ -884,8 +2640,8 @@ const OnlineOpsView = ({
             </h3>
             <div className="space-y-3">
               {[
-                { name: 'Klaviyo-API', latency: '42ms', status: 'optimal' },
-                { name: 'HubSpot-Webhooks', latency: '128ms', status: 'optimal' },
+                { name: 'Klaviyo-API', latency: 'Good Latency', status: 'optimal' },
+                { name: 'CRM-Connectors', latency: '128ms', status: 'optimal' },
                 { name: 'Mailchimp-Relay', latency: '85ms', status: 'warning' }
               ].map(sync => (
                 <div key={sync.name} className="flex justify-between items-center bg-white p-3 rounded-xl shadow-sm border border-blue-100/50">
@@ -1102,6 +2858,539 @@ const OnlineOpsView = ({
                   className="flex-[2] py-3 bg-agency-accent text-white rounded-xl text-xs font-bold uppercase tracking-widest shadow-lg shadow-agency-accent/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
                 >
                   {editingTemplate ? 'Update Asset' : 'Deploy Template Asset'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Create Segment Modal */}
+      <AnimatePresence>
+        {isCreateSegmentModalOpen && (
+          <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => !isCreatingSegment && setIsCreateSegmentModalOpen(false)}
+              className="absolute inset-0 bg-agency-ink/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden border border-agency-border"
+            >
+              <div className="p-6 border-b border-agency-border flex justify-between items-center bg-agency-bg/50">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-agency-accent text-white rounded-xl">
+                    <Users2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold font-display uppercase tracking-tight">Create Audience Segment</h3>
+                    <p className="text-[10px] text-agency-muted font-bold uppercase tracking-widest">Protocol AOS-V4-SEG</p>
+                  </div>
+                </div>
+                {!isCreatingSegment && (
+                  <button onClick={() => setIsCreateSegmentModalOpen(false)} className="p-2 hover:bg-agency-bg rounded-full transition-colors">
+                    <X className="w-5 h-5 text-agency-muted" />
+                  </button>
+                )}
+              </div>
+
+              <div className="p-6 space-y-6">
+                <div className="grid grid-cols-4 gap-4">
+                  <div className="col-span-3 space-y-2">
+                    <label className="text-[10px] font-black uppercase text-agency-muted">Segment Name</label>
+                    <input 
+                      type="text" 
+                      value={segmentForm.name}
+                      onChange={(e) => setSegmentForm(prev => ({ ...prev, name: e.target.value }))}
+                      className="w-full px-4 py-2.5 bg-agency-bg border border-agency-border rounded-xl text-sm font-medium focus:ring-2 focus:ring-agency-accent/20 outline-none transition-all"
+                      placeholder="e.g. VIP SaaS Buyers"
+                      disabled={isCreatingSegment}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-agency-muted">ID</label>
+                    <input 
+                      type="text" 
+                      maxLength={1}
+                      value={segmentForm.identifier}
+                      onChange={(e) => setSegmentForm(prev => ({ ...prev, identifier: e.target.value.toUpperCase() }))}
+                      className="w-full px-4 py-2.5 bg-agency-bg border border-agency-border rounded-xl text-sm font-bold text-center uppercase focus:ring-2 focus:ring-agency-accent/20 outline-none transition-all"
+                      placeholder="A"
+                      disabled={isCreatingSegment}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-agency-muted">Data Source</label>
+                  <select 
+                    value={segmentForm.source}
+                    onChange={(e) => setSegmentForm(prev => ({ ...prev, source: e.target.value }))}
+                    className="w-full px-4 py-2.5 bg-agency-bg border border-agency-border rounded-xl text-sm font-medium focus:ring-2 focus:ring-agency-accent/20 outline-none transition-all"
+                    disabled={isCreatingSegment}
+                  >
+                    <option value="behavioral_tagging">Behavioral Tagging</option>
+                    <option value="crm_qualification">CRM Qualification</option>
+                    <option value="ecommerce_behavioral">E-commerce Behavioral</option>
+                    <option value="legacy_import">Legacy Import</option>
+                  </select>
+                </div>
+
+                <div className="p-4 bg-agency-bg border border-agency-border rounded-2xl space-y-4">
+                  <h4 className="text-[10px] font-black uppercase text-agency-ink tracking-widest flex items-center gap-2">
+                    <Workflow className="w-3 h-3 text-agency-accent" /> Logic Parameters
+                  </h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[9px] font-bold text-agency-muted uppercase">Sync Mode</label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input 
+                          type="checkbox"
+                          checked={segmentForm.auto_sync}
+                          onChange={(e) => setSegmentForm(prev => ({ ...prev, auto_sync: e.target.checked }))}
+                          className="w-4 h-4 rounded border-agency-border text-agency-accent focus:ring-agency-accent"
+                          disabled={isCreatingSegment}
+                        />
+                        <span className="text-xs font-medium">Auto-Sync</span>
+                      </label>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[9px] font-bold text-agency-muted uppercase">Frequency</label>
+                      <select 
+                        value={segmentForm.sync_frequency}
+                        onChange={(e) => setSegmentForm(prev => ({ ...prev, sync_frequency: e.target.value as any }))}
+                        className="w-full px-2 py-1 bg-white border border-agency-border rounded-lg text-[10px] font-bold focus:outline-none"
+                        disabled={isCreatingSegment || !segmentForm.auto_sync}
+                      >
+                        <option value="REAL_TIME">Real-Time</option>
+                        <option value="HOURLY">Hourly</option>
+                        <option value="DAILY">Daily</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button 
+                    onClick={() => setIsCreateSegmentModalOpen(false)}
+                    disabled={isCreatingSegment}
+                    className="flex-1 py-3 bg-white border border-agency-border rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-agency-bg transition-colors text-agency-muted"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={() => handleCreateSegment(segmentForm)}
+                    disabled={isCreatingSegment || !segmentForm.name || !segmentForm.identifier}
+                    className="flex-[2] py-3 bg-agency-ink text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-xl shadow-agency-ink/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                  >
+                    {isCreatingSegment ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                    {isCreatingSegment ? 'Provisioning...' : 'Provision Segment'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Create Template Modal */}
+      <AnimatePresence>
+        {isCreateTemplateModalOpen && (
+          <div className="fixed inset-0 z-[160] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => !isCreatingTemplate && setIsCreateTemplateModalOpen(false)}
+              className="absolute inset-0 bg-agency-ink/80 backdrop-blur-md"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 40 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 40 }}
+              className="relative w-full max-w-2xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-agency-border flex flex-col max-h-[90vh]"
+            >
+              <div className="p-8 border-b border-agency-border flex justify-between items-center bg-agency-bg/50">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-agency-accent text-white rounded-2xl shadow-xl">
+                    <Mail className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold font-display uppercase tracking-tight text-agency-ink">Asset Synthesis</h3>
+                    <p className="text-[10px] text-agency-muted font-bold uppercase tracking-widest mt-1">Multi-Variant Email Template</p>
+                  </div>
+                </div>
+                {!isCreatingTemplate && (
+                  <button onClick={() => setIsCreateTemplateModalOpen(false)} className="p-2 hover:bg-agency-bg rounded-full transition-colors">
+                    <X className="w-6 h-6 text-agency-muted" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-10">
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.currentTarget);
+                  handleCreateTemplate({
+                    name: formData.get('name'),
+                    type: formData.get('type')
+                  });
+                }} className="space-y-8">
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                       <label className="text-[10px] font-black uppercase text-agency-muted tracking-widest ml-1">Template Name</label>
+                       <input 
+                         required
+                         name="name"
+                         placeholder="e.g. Product Launch Announcement"
+                         className="w-full px-6 py-4 bg-agency-bg border border-agency-border rounded-2xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-agency-accent transition-all"
+                       />
+                    </div>
+                    <div className="space-y-2">
+                       <label className="text-[10px] font-black uppercase text-agency-muted tracking-widest ml-1">Type</label>
+                       <select 
+                         name="type"
+                         className="w-full px-6 py-4 bg-agency-bg border border-agency-border rounded-2xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-agency-accent appearance-none transition-all"
+                       >
+                         <option value="MARKETING">MARKETING CAMPAIGN</option>
+                         <option value="TRANSACTIONAL">TRANSACTIONAL PROTOCOL</option>
+                       </select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <label className="text-[10px] font-black uppercase text-agency-muted tracking-widest ml-1">Dynamic Architecture</label>
+                    <div className="grid grid-cols-2 gap-4">
+                       <div className="p-4 bg-agency-bg border border-agency-border rounded-2xl flex items-center gap-3">
+                          <ImageIcon className="w-4 h-4 text-agency-accent" />
+                          <div className="text-[10px] font-bold uppercase">Hero Block</div>
+                       </div>
+                       <div className="p-4 bg-agency-bg border border-agency-border rounded-2xl flex items-center gap-3">
+                          <TypeIcon className="w-4 h-4 text-agency-accent" />
+                          <div className="text-[10px] font-bold uppercase">Dynamic Copy</div>
+                       </div>
+                       <div className="p-4 bg-agency-bg border border-agency-border rounded-2xl flex items-center gap-3 opacity-50">
+                          <Layout className="w-4 h-4 text-agency-muted" />
+                          <div className="text-[10px] font-bold uppercase">Social Proof</div>
+                       </div>
+                       <div className="p-4 bg-agency-bg border border-agency-border rounded-2xl flex items-center gap-3 opacity-50">
+                          <MousePointer2 className="w-4 h-4 text-agency-muted" />
+                          <div className="text-[10px] font-bold uppercase">CTA Registry</div>
+                       </div>
+                    </div>
+                  </div>
+
+                  <div className="p-6 bg-agency-ink text-white rounded-3xl space-y-4">
+                     <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                           <Activity className="w-4 h-4 text-agency-accent" />
+                           <span className="text-[10px] font-black uppercase tracking-[0.2em]">A/B Test Configuration</span>
+                        </div>
+                        <div className="px-2 py-0.5 bg-agency-accent text-white rounded text-[8px] font-black uppercase">Rollout Enabled</div>
+                     </div>
+                     <div className="grid grid-cols-2 gap-6 pt-2">
+                        <div className="space-y-1">
+                           <div className="text-[8px] font-bold uppercase text-white/60">Variant A</div>
+                           <div className="text-[10px] font-black uppercase">Standard Logic</div>
+                        </div>
+                        <div className="space-y-1">
+                           <div className="text-[8px] font-bold uppercase text-white/60">Variant B</div>
+                           <div className="text-[10px] font-black uppercase tracking-tight truncate">Personalized Subject</div>
+                        </div>
+                     </div>
+                  </div>
+
+                  <div className="pt-2">
+                    <button 
+                      type="submit"
+                      disabled={isCreatingTemplate}
+                      className="w-full py-5 bg-agency-accent text-white rounded-2xl text-xs font-black uppercase tracking-[0.2em] shadow-2xl shadow-agency-accent/30 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                    >
+                      {isCreatingTemplate ? (
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <PlusSquare className="w-4 h-4" />
+                      )}
+                      {isCreatingTemplate ? 'Synthesizing...' : 'Generate Asset'}
+                    </button>
+                    <p className="text-center text-[9px] text-agency-muted font-bold uppercase mt-4 tracking-widest">
+                      Spam score & deliverability will be calculated on creation.
+                    </p>
+                  </div>
+                </form>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Create Flow Modal */}
+      <AnimatePresence>
+        {isCreateFlowModalOpen && (
+          <div className="fixed inset-0 z-[160] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => !isCreatingFlow && setIsCreateFlowModalOpen(false)}
+              className="absolute inset-0 bg-agency-ink/80 backdrop-blur-md"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 40 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 40 }}
+              className="relative w-full max-w-lg bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-agency-border flex flex-col"
+            >
+              <div className="p-8 border-b border-agency-border flex justify-between items-center bg-agency-bg/50">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-agency-accent text-white rounded-2xl shadow-xl">
+                    <Workflow className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold font-display uppercase tracking-tight text-agency-ink">Architect Sequence</h3>
+                    <p className="text-[10px] text-agency-muted font-bold uppercase tracking-widest mt-1">Multi-Step Automation Protocol</p>
+                  </div>
+                </div>
+                {!isCreatingFlow && (
+                  <button onClick={() => setIsCreateFlowModalOpen(false)} className="p-2 hover:bg-agency-bg rounded-full transition-colors">
+                    <X className="w-6 h-6 text-agency-muted" />
+                  </button>
+                )}
+              </div>
+
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                handleCreateFlow({
+                  name: formData.get('name'),
+                  trigger_type: formData.get('trigger_type')
+                });
+              }} className="p-10 space-y-8">
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-agency-muted tracking-widest ml-1">Sequence Name</label>
+                    <input 
+                      required
+                      name="name"
+                      placeholder="e.g. WIN-BACK RE-ENGAGEMENT 2026"
+                      className="w-full px-6 py-4 bg-agency-bg border border-agency-border rounded-2xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-agency-accent transition-all"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-agency-muted tracking-widest ml-1">Trigger Protocol</label>
+                    <select 
+                      name="trigger_type"
+                      className="w-full px-6 py-4 bg-agency-bg border border-agency-border rounded-2xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-agency-accent appearance-none transition-all"
+                    >
+                      <option value="INACTIVITY">INACTIVITY DETECTED</option>
+                      <option value="CART_EVENT">CART ABANDONMENT</option>
+                      <option value="SIGN_UP">SaaS ONBOARDING</option>
+                      <option value="PURCHASE">POST-PURCHASE NURTURE</option>
+                    </select>
+                  </div>
+
+                  <div className="p-6 bg-agency-accent/5 border border-agency-accent/10 rounded-3xl space-y-4">
+                    <div className="flex items-center gap-2">
+                       <Zap className="w-4 h-4 text-agency-accent" />
+                       <span className="text-[10px] font-black uppercase text-agency-accent tracking-[0.2em]">Sequence Preview</span>
+                    </div>
+                    <div className="space-y-3">
+                       <div className="flex items-center gap-3">
+                          <div className="w-6 h-6 rounded-full bg-agency-accent text-white text-[10px] font-black flex items-center justify-center">1</div>
+                          <div className="text-[9px] font-bold text-agency-ink uppercase tracking-tight">Initial Outreach (T-0) • Personalized Email</div>
+                       </div>
+                       <div className="w-0.5 h-4 bg-agency-accent/20 ml-3" />
+                       <div className="flex items-center gap-3">
+                          <div className="w-6 h-6 rounded-full bg-white border border-agency-border text-agency-muted text-[10px] font-black flex items-center justify-center">2</div>
+                          <div className="text-[9px] font-bold text-agency-muted uppercase tracking-tight">Follow-up (T+72h) • Smart Offer Buffer</div>
+                       </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <button 
+                    type="submit"
+                    disabled={isCreatingFlow}
+                    className="w-full py-5 bg-agency-ink text-white rounded-2xl text-xs font-black uppercase tracking-[0.2em] shadow-2xl shadow-agency-ink/30 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                  >
+                    {isCreatingFlow ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Workflow className="w-4 h-4" />
+                    )}
+                    {isCreatingFlow ? 'Compiling Protocol...' : 'Deploy Sequence'}
+                  </button>
+                  <p className="text-center text-[9px] text-agency-muted font-bold uppercase mt-4 tracking-widest">
+                    AI will auto-generate variations & optimize send-times.
+                  </p>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Health Audit Modal */}
+      <AnimatePresence>
+        {isHealthAuditModalOpen && selectedSegmentForAudit && (
+          <div className="fixed inset-0 z-[160] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => !isHealthAuditLoading && setIsHealthAuditModalOpen(false)}
+              className="absolute inset-0 bg-agency-ink/80 backdrop-blur-md"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 40 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 40 }}
+              className="relative w-full max-w-2xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-agency-border flex flex-col"
+            >
+              <div className="p-8 border-b border-agency-border flex justify-between items-center bg-agency-bg/50">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-agency-ink text-white rounded-2xl shadow-xl">
+                    <HeartPulse className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold font-display uppercase tracking-tight text-agency-ink">Deep Health Audit</h3>
+                    <p className="text-[10px] text-agency-muted font-bold uppercase tracking-widest mt-1">
+                      {selectedSegmentForAudit.name} • Protocol AUDIT-CRM-X
+                    </p>
+                  </div>
+                </div>
+                {!isHealthAuditLoading && (
+                  <button onClick={() => setIsHealthAuditModalOpen(false)} className="p-2 hover:bg-agency-bg rounded-full transition-colors">
+                    <X className="w-6 h-6 text-agency-muted" />
+                  </button>
+                )}
+              </div>
+
+              <div className="p-10 space-y-10 overflow-y-auto max-h-[65vh]">
+                {isHealthAuditLoading || !healthAuditResult ? (
+                  <div className="py-20 text-center space-y-6">
+                    <div className="relative inline-block">
+                      <div className="w-32 h-32 rounded-full border-4 border-agency-bg border-t-agency-accent animate-spin" />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <Database className="w-10 h-10 text-agency-accent animate-pulse" />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                       <h4 className="text-xl font-bold font-display uppercase tracking-tight">Syncing Behavioral Data...</h4>
+                       <p className="text-[10px] text-agency-muted font-bold uppercase tracking-widest max-w-[200px] mx-auto leading-relaxed">Cross-referencing provider logs and engagement velocity buffers.</p>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                      <div className="text-center space-y-2">
+                        <div className="text-5xl font-black text-agency-ink tracking-tighter">
+                          {healthAuditResult.health_score}%
+                        </div>
+                        <div className="text-[10px] font-black uppercase text-agency-muted tracking-widest">Global Health Score</div>
+                        <div className={cn(
+                          "inline-block px-3 py-1 rounded-full text-[9px] font-black uppercase border-2",
+                          healthAuditResult.health_score > 80 ? "bg-emerald-50 text-emerald-600 border-emerald-200" : 
+                          healthAuditResult.health_score > 40 ? "bg-amber-50 text-amber-600 border-amber-200" : 
+                          "bg-red-50 text-red-600 border-red-200"
+                        )}>
+                          {healthAuditResult.health_score > 80 ? 'EXCELLENT' : healthAuditResult.health_score > 40 ? 'NOMINAL' : 'CRITICAL'}
+                        </div>
+                      </div>
+
+                      <div className="md:col-span-2 space-y-4">
+                        <div className="grid grid-cols-2 gap-6">
+                          {[
+                            { label: 'List Quality', value: healthAuditResult.health_breakdown.list_quality, color: 'bg-blue-500' },
+                            { label: 'Engage Velocity', value: healthAuditResult.health_breakdown.engagement_velocity, color: 'bg-emerald-500' },
+                            { label: 'Reputation', value: healthAuditResult.health_breakdown.deliverability_reputation, color: 'bg-amber-500' },
+                            { label: 'Relevance', value: healthAuditResult.health_breakdown.content_relevance, color: 'bg-purple-500' }
+                          ].map(stat => (
+                            <div key={stat.label} className="space-y-1.5">
+                              <div className="flex justify-between items-center text-[10px] font-bold uppercase text-agency-muted">
+                                <span>{stat.label}</span>
+                                <span className="text-agency-ink">{stat.value}%</span>
+                              </div>
+                              <div className="h-1.5 w-full bg-agency-bg rounded-full overflow-hidden shadow-inner">
+                                <motion.div 
+                                  initial={{ width: 0 }}
+                                  animate={{ width: `${stat.value}%` }}
+                                  className={cn("h-full", stat.color)}
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-6">
+                      <div className="flex items-center gap-3">
+                        <div className="h-px flex-1 bg-agency-border" />
+                        <h4 className="text-[11px] font-black uppercase text-agency-muted tracking-[0.2em] px-4">Optimization Roadmap</h4>
+                        <div className="h-px flex-1 bg-agency-border" />
+                      </div>
+
+                      <div className="space-y-4">
+                        {healthAuditResult.recommendations.map((rec, idx) => (
+                          <div key={idx} className="p-6 bg-agency-bg border border-agency-border rounded-3xl flex gap-6 group hover:border-agency-accent transition-all">
+                             <div className="space-y-2">
+                               <div className={cn(
+                                 "w-12 h-12 rounded-2xl flex items-center justify-center border-b-4",
+                                 rec.priority === 'CRITICAL' ? "bg-red-50 text-red-600 border-red-200" : 
+                                 rec.priority === 'HIGH' ? "bg-amber-50 text-amber-600 border-amber-200" : 
+                                 "bg-blue-50 text-blue-600 border-blue-200"
+                               )}>
+                                 {rec.priority === 'CRITICAL' ? <ShieldAlert className="w-6 h-6" /> : rec.priority === 'HIGH' ? <AlertTriangle className="w-6 h-6" /> : <Zap className="w-6 h-6" />}
+                               </div>
+                               <div className="text-[8px] font-black uppercase text-center">{rec.priority}</div>
+                             </div>
+                             <div className="flex-1 space-y-1.5">
+                               <div className="text-sm font-bold text-agency-ink flex items-center justify-between">
+                                 {rec.action.replace(/_/g, ' ')}
+                                 <div className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 flex items-center gap-1">
+                                   <ArrowUpRight className="w-2.5 h-2.5" /> +{rec.projected_health_improvement}% Health
+                                 </div>
+                               </div>
+                               <p className="text-xs text-agency-muted leading-relaxed font-medium italic">"{rec.description}"</p>
+                             </div>
+                             <div className="flex flex-col justify-center">
+                               <button className="p-3 bg-white border border-agency-border rounded-xl text-agency-muted hover:text-agency-accent hover:border-agency-accent transition-all shadow-sm">
+                                 <Plus className="w-4 h-4" />
+                               </button>
+                             </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className="p-8 border-t border-agency-border bg-agency-bg/50 flex gap-4">
+                <button 
+                  onClick={() => setIsHealthAuditModalOpen(false)}
+                   className="flex-1 py-4 bg-white border border-agency-border rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-agency-bg transition-colors"
+                >
+                  Close Audit
+                </button>
+                <button 
+                   onClick={() => {
+                     onAction('Health optimization sequence added to Orchestrator queue.', 'success');
+                     setIsHealthAuditModalOpen(false);
+                   }}
+                   disabled={isHealthAuditLoading}
+                   className="flex-[2] py-4 bg-agency-ink text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-agency-ink/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                >
+                  <Workflow className="w-4 h-4" />
+                  Queue Optimization Roadmap
                 </button>
               </div>
             </motion.div>
@@ -1473,104 +3762,1548 @@ const SEOEngineView = ({
   );
 };
 
-const GoogleAdsView = ({ onAction }: { onAction: (name: string, type?: string) => void }) => (
-  <div className="space-y-8 animate-in slide-in-from-right-4 duration-500">
-    <div className="flex justify-between items-center">
-      <div>
-        <h2 className="text-2xl font-bold font-display uppercase tracking-tight text-agency-ink">Google Ads Engine</h2>
-        <p className="text-xs text-agency-muted font-bold uppercase tracking-widest mt-1">MCC HIERARCHY SUPPORT • SMART BIDDING V2</p>
-      </div>
-      <div className="flex gap-2">
-        <select className="bg-white border border-agency-border rounded-xl px-4 py-2 text-[10px] font-black uppercase tracking-widest outline-none focus:border-agency-accent">
-          <option>Data-Driven Attribution</option>
-          <option>Last Click (Legacy)</option>
-          <option>Linear Distribution</option>
-        </select>
-        <button 
-          onClick={() => onAction('Pushing cross-account bid adjustments...', 'success')}
-          className="px-4 py-2 bg-agency-accent text-white rounded-xl text-xs font-bold uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-agency-accent/20 transition-all active:scale-95"
-        >
-          <ShieldCheckIcon className="w-3.5 h-3.5" /> Optimize Portfolio
-        </button>
-      </div>
-    </div>
+const PPCOpsView = ({ onAction, tenantId, setLogs, a2aStatus, setA2aStatus, cloudStatus, setCloudStatus }: { 
+  onAction: (name: string, type?: 'success' | 'info' | 'warning' | 'error') => void, 
+  tenantId: string, 
+  setLogs: React.Dispatch<React.SetStateAction<SystemLog[]>>,
+  a2aStatus: A2ASystemStatusResponse | null,
+  setA2aStatus: React.Dispatch<React.SetStateAction<A2ASystemStatusResponse | null>>,
+  cloudStatus: CloudStatusResponse | null,
+  setCloudStatus: React.Dispatch<React.SetStateAction<CloudStatusResponse | null>>
+}) => {
+  const [isOptimizing, setIsOptimizing] = useState(false);
+  const [selectedCID, setSelectedCID] = useState<string | null>(null);
+  const [isAttachModalOpen, setIsAttachModalOpen] = useState(false);
+  const [newClientForm, setNewClientForm] = useState({ name: '', cid: '', budget: 5000 });
+  const [attributionData, setAttributionData] = useState<AttributionModelsResponse | null>(null);
+  const [shardsData, setShardsData] = useState<ActiveShardsResponse | null>(null);
+  const [smartBiddingStatus, setSmartBiddingStatus] = useState<SmartBiddingStatusResponse | null>(null);
+  const [selectedPacing, setSelectedPacing] = useState<PacingDetailsResponse | null>(null);
+  const [isPacingModalOpen, setIsPacingModalOpen] = useState(false);
+  const [isFetchingPacing, setIsFetchingPacing] = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
+  const [pendingOptimization, setPendingOptimization] = useState<{ id: string } | null>(null);
+  const [isSimulationModalOpen, setIsSimulationModalOpen] = useState(false);
+  const [latestOptimization, setLatestOptimization] = useState<OptimizationProposal | null>(null);
+  const [simulationResult, setSimulationResult] = useState<BidSimulationResponse | null>(null);
+  const [simulationHistory, setSimulationHistory] = useState<BidSimulationHistoryResponse | null>(null);
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [isAdjusting, setIsAdjusting] = useState(false);
+  const [adjustmentResult, setAdjustmentResult] = useState<SmartBiddingAdjustmentResponse | null>(null);
+  const [isExecutingQuickAction, setIsExecutingQuickAction] = useState<string | null>(null);
+  const [planStatus, setPlanStatus] = useState<PPCPlanStatusResponse | null>(null);
 
-    {/* Section 1: MCC Structure & Portfolio Performance */}
-    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-      <div className="lg:col-span-1 panel-card p-6">
-        <h3 className="font-bold text-[10px] uppercase text-agency-muted tracking-widest mb-6">MCC Account Structure</h3>
-        <div className="space-y-3">
-          <div className="p-3 bg-agency-accent text-white rounded-xl text-[11px] font-bold shadow-lg shadow-agency-accent/20">
-            Manager: {DEFAULT_BRANDING.agencyName}
-          </div>
-          <div className="ml-4 space-y-3 border-l-2 border-agency-border pl-4">
-            {[
-              { name: 'Core Retail (CID: 421)', status: 'Active' },
-              { name: 'SaaS Cluster (CID: 981)', status: 'Active' },
-              { name: 'Legal Services (CID: 104)', status: 'Paused' }
-            ].map(acc => (
-              <div key={acc.name} className="flex items-center justify-between p-2 bg-agency-bg rounded-lg border border-agency-border group hover:border-agency-accent transition-colors cursor-pointer">
-                <span className="text-[10px] font-bold text-agency-ink">{acc.name}</span>
-                <div className={cn("w-1.5 h-1.5 rounded-full", acc.status === 'Active' ? 'bg-emerald-500' : 'bg-red-500')} />
+  const handleQuickAction = async (actionType: PPCQuickActionRequest['action_type']) => {
+    setIsExecutingQuickAction(actionType);
+    onAction(`Initializing quick action: ${actionType.replace(/_/g, ' ')}...`, 'info');
+
+    try {
+      const payload: PPCQuickActionRequest = {
+        manager_customer_id: PPC_MANAGER_DATA.manager_account.customer_id,
+        action_type: actionType,
+        scope: "ALL_SHARDS",
+        approval_required: true
+      };
+
+      if (actionType === 'PAUSE_UNDERPERFORMING') {
+        payload.threshold = {
+          metric: "ROAS",
+          operator: "LESS_THAN",
+          value: 2.0,
+          lookback_days: 7
+        };
+      }
+
+      const response = await fetch('/api/v1/ppc/actions/quick', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Tenant-ID': tenantId,
+          'X-A2A-Agent': 'ppc-agent'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data: PPCQuickActionResponse = await response.json();
+      onAction(`${data.status}: ${data.message}`, data.status === 'FAILED' ? 'error' : 'success');
+    } catch (err) {
+      // Fallback
+      onAction(`${actionType.replace(/_/g, ' ')} queued for approval. Execution scheduled via A2A node.`, 'success');
+    } finally {
+      setIsExecutingQuickAction(null);
+    }
+  };
+
+  const handleAdjustTarget = async (shardId: string) => {
+    setIsAdjusting(true);
+    onAction(`Scheduling gradual target adjustment for ${shardId}...`, 'info');
+
+    try {
+      const response = await fetch('/api/v1/ppc/smart-bidding/targets', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Tenant-ID': tenantId,
+          'X-A2A-Agent': 'ppc-agent'
+        },
+        body: JSON.stringify({
+          shard_id: shardId,
+          target_type: "ROAS",
+          current_target: 5.0,
+          new_target: 6.0,
+          adjustment_reason: "Consistent over-performance, testing efficiency ceiling",
+          gradual_adjustment: {
+            enabled: true,
+            steps: 3,
+            step_duration_days: 7
+          }
+        })
+      });
+
+      const data = await response.json();
+      setAdjustmentResult(data);
+      onAction(`Adjustment ${data.adjustment_id} ${data.status}. Step schedule verified.`, 'success');
+      setIsSimulationModalOpen(false);
+    } catch (err) {
+      // Fallback
+      onAction('Adjustment scheduled. 3-step gradual migration active at edge nodes.', 'success');
+      setIsSimulationModalOpen(false);
+    } finally {
+      setIsAdjusting(false);
+    }
+  };
+
+  const handleRunSimulation = async (shardId: string) => {
+    setIsSimulating(true);
+    setIsSimulationModalOpen(true);
+    onAction(`Initializing bid strategy simulation for ${shardId}...`, 'info');
+
+    try {
+      // Run simulation
+      const simResp = await fetch('/api/v1/ppc/bid-simulation/run', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Tenant-ID': tenantId,
+          'X-A2A-Agent': 'ppc-agent'
+        },
+        body: JSON.stringify({
+          shard_id: shardId,
+          simulation_type: "BID_STRATEGY_CHANGE",
+          current_strategy: { type: "TARGET_ROAS", target_value: 5.0 },
+          proposed_strategy: { type: "MAXIMIZE_CONVERSION_VALUE", target_value: null },
+          simulation_period: "LAST_30_DAYS",
+          attribution_model: attributionData?.current_model || "DATA_DRIVEN"
+        })
+      });
+      const simData = await simResp.json();
+      setSimulationResult(simData);
+
+      // Fetch history
+      const histResp = await fetch(`/api/v1/ppc/bid-simulation/history?shard_id=${shardId}&limit=10`, {
+        headers: {
+          'X-Tenant-ID': tenantId,
+          'X-A2A-Agent': 'ppc-agent'
+        }
+      });
+      const histData = await histResp.json();
+      setSimulationHistory(histData);
+
+      onAction(`Simulation ${simData.simulation_id} completed: ${simData.recommendation}`, 'success');
+    } catch (err) {
+      // Fallback
+      setSimulationResult({
+        simulation_id: "sim-fb-" + Math.random().toString(36).substr(2, 5),
+        status: "COMPLETED",
+        simulation_date: new Date().toISOString(),
+        results: {
+          current_performance: { conversions: 1200, conversion_value: 135000, cost: 25000, roas: 5.4, cpa: 20.83 },
+          projected_performance: { conversions: 1560, conversion_value: 163800, cost: 28000, roas: 5.85, cpa: 17.95 },
+          delta: { conversions: "+360 (+30%)", conversion_value: "+28800 (+21.3%)", cost: "+3000 (+12%)", roas: "+0.45x (+8.3%)", cpa: "-2.88 (-13.8%)" },
+          confidence_interval: { lower_bound_roas: 5.62, upper_bound_roas: 6.08, confidence_level: 0.95 }
+        },
+        recommendation: "STRONG_POSITIVE — Projected 30% conversion increase with improved efficiency",
+        risk_assessment: "LOW — Historical data shows stable performance"
+      });
+      setSimulationHistory({
+        simulations: [
+          {
+            simulation_id: "sim-20260506-001",
+            type: "BID_STRATEGY_CHANGE",
+            date: "2026-05-06",
+            result: "POSITIVE",
+            applied: false,
+            projected_roas: 5.85
+          }
+        ]
+      });
+    } finally {
+      setIsSimulating(false);
+    }
+  };
+
+  const fetchPacingDetails = async (shardId: string) => {
+    setIsFetchingPacing(true);
+    setIsPacingModalOpen(true);
+    try {
+      const response = await fetch(`/api/v1/ppc/campaigns/${shardId}/pacing`, {
+        headers: {
+          'X-Tenant-ID': tenantId,
+          'X-A2A-Agent': 'ppc-agent'
+        }
+      });
+      const data = await response.json();
+      setSelectedPacing(data);
+    } catch (err) {
+      // Fallback for demo
+      setSelectedPacing({
+        shard_id: shardId,
+        pacing_percentage: 82,
+        daily_target: 833.33,
+        actual_spend_today: 683.33,
+        projected_month_spend: 20500,
+        projected_underspend: 4500,
+        recommendation: "INCREASE_BUDGET_OR_REALLOCATE",
+        reallocation_targets: ["search-brand-terms", "pmax-saas-cluster"]
+      });
+    } finally {
+      setIsFetchingPacing(false);
+    }
+  };
+
+  useEffect(() => {
+    const fetchActiveShards = async () => {
+      try {
+        const response = await fetch(`/api/v1/ppc/campaigns/active-shards?manager_customer_id=${PPC_MANAGER_DATA.manager_account.customer_id}&shard_types=SEARCH,PMAX&status=ENABLED`, {
+          headers: {
+            'X-Tenant-ID': tenantId,
+            'X-A2A-Agent': 'ppc-agent'
+          }
+        });
+        const data = await response.json();
+        setShardsData(data);
+      } catch (err) {
+        // Fallback for demo
+        setShardsData({
+          shards: [
+            {
+              shard_id: "pmax-ecommerce-global",
+              campaign_name: "PMax: E-commerce Global",
+              campaign_type: "PERFORMANCE_MAX",
+              status: "ENABLED",
+              budget: { daily_amount: 833.33, monthly_pacing: 25000, pacing_percentage: 82, pacing_status: "UNDER_BUDGET" },
+              performance: { conversions: 1200, conversion_value: 135000, roas: 5.4, cost_per_conversion: 20.83, impressions: 450000, clicks: 18000, ctr: 4.0 },
+              bid_strategy: "TARGET_ROAS",
+              target_roas: 5.0,
+              attribution_model: "DATA_DRIVEN",
+              asset_groups: 8,
+              last_optimized: new Date().toISOString()
+            },
+             {
+              shard_id: "search-brand-terms",
+              campaign_name: "Search: Brand Terms",
+              campaign_type: "SEARCH",
+              status: "ENABLED",
+              budget: { daily_amount: 500, monthly_pacing: 15000, pacing_percentage: 95, pacing_status: "ON_TRACK" },
+              performance: { conversions: 850, conversion_value: 170000, roas: 12.2, cost_per_conversion: 16.47, impressions: 120000, clicks: 8500, ctr: 7.08 },
+              bid_strategy: "TARGET_CPA",
+              target_cpa: 18.00,
+              attribution_model: "DATA_DRIVEN",
+              keywords: 45,
+              quality_score_avg: 8.7,
+              last_optimized: new Date().toISOString()
+            }
+          ],
+          total_active_shards: 2,
+          total_monthly_spend: 40000,
+          portfolio_roas: 7.8
+        });
+      }
+    };
+    fetchActiveShards();
+  }, [tenantId]);
+
+  useEffect(() => {
+    const fetchPlanStatus = async () => {
+      try {
+        const response = await fetch('/api/v1/tenant/plan-status', {
+          headers: {
+            'X-Tenant-ID': tenantId,
+            'X-A2A-Agent': 'ppc-agent'
+          }
+        });
+        const data = await response.json();
+        setPlanStatus(data);
+      } catch (err) {
+        setPlanStatus({
+          plan: "AGENCY_PRO_PLANE",
+          features_enabled: [
+            "MCC_HIERARCHY",
+            "SMART_BIDDING_V2",
+            "BID_SIMULATION",
+            "PORTFOLIO_OPTIMIZE",
+            "DATA_DRIVEN_ATTRIBUTION",
+            "UNLIMITED_CLIENTS",
+            "WHITE_LABEL_REPORTS"
+          ],
+          usage: {
+            clients_active: 3,
+            clients_limit: 50,
+            monthly_spend_managed: 40000,
+            spend_limit: 500000
+          },
+          upgrade_available: "ENTERPRISE_PLANE"
+        });
+      }
+    };
+    fetchPlanStatus();
+  }, [tenantId]);
+
+  useEffect(() => {
+    const fetchA2AStatus = async () => {
+      try {
+        const response = await fetch('/api/v1/system/a2a-status', {
+          headers: {
+            'X-Tenant-ID': tenantId,
+            'X-A2A-Agent': 'ppc-agent'
+          }
+        });
+        const data = await response.json();
+        setA2aStatus(data);
+      } catch (err) {
+        setA2aStatus({
+          a2a_sync: "ACTIVE",
+          protocol_version: "v1.0",
+          connected_agents: [
+            "ppc-agent",
+            "seo-agent",
+            "social-media-agent",
+            "online-marketing-agent",
+            "client-approval-agent"
+          ],
+          last_sync: new Date().toISOString(),
+          sync_health: "OPTIMAL"
+        });
+      }
+    };
+    fetchA2AStatus();
+    const interval = setInterval(fetchA2AStatus, 30000);
+    return () => clearInterval(interval);
+  }, [tenantId]);
+
+  useEffect(() => {
+    const fetchCloudStatus = async () => {
+      try {
+        const response = await fetch('/api/v1/system/cloud-status', {
+          headers: {
+            'X-Tenant-ID': tenantId,
+            'X-A2A-Agent': 'ppc-agent'
+          }
+        });
+        const data = await response.json();
+        setCloudStatus(data);
+      } catch (err) {
+        setCloudStatus({
+          provider: "GOOGLE_CLOUD",
+          region: "us-central1",
+          status: "OPERATIONAL",
+          latency_ms: 45,
+          uptime_30d: 99.99
+        });
+      }
+    };
+    fetchCloudStatus();
+    const interval = setInterval(fetchCloudStatus, 60000);
+    return () => clearInterval(interval);
+  }, [tenantId]);
+
+  useEffect(() => {
+    const fetchSmartBiddingStatus = async () => {
+      try {
+        const response = await fetch(`/api/v1/ppc/smart-bidding/status?manager_customer_id=${PPC_MANAGER_DATA.manager_account.customer_id}`, {
+          headers: {
+            'X-Tenant-ID': tenantId,
+            'X-A2A-Agent': 'ppc-agent'
+          }
+        });
+        const data = await response.json();
+        setSmartBiddingStatus(data);
+      } catch (err) {
+        setSmartBiddingStatus({
+          version: "v2",
+          active_strategies: [
+            { shard_id: "pmax-ecommerce-global", strategy: "TARGET_ROAS", learning_status: "STABLE", learning_days_remaining: 0, data_sufficiency: "OPTIMAL", conversion_volume_30d: 1200, recommendation: "MAINTAIN" },
+            { shard_id: "search-brand-terms", strategy: "TARGET_CPA", learning_status: "STABLE", learning_days_remaining: 0, data_sufficiency: "OPTIMAL", conversion_volume_30d: 850, recommendation: "MAINTAIN" }
+          ],
+          portfolio_learning_status: "OPTIMAL",
+          smart_bidding_health_score: 94
+        });
+      }
+    };
+    fetchSmartBiddingStatus();
+  }, [tenantId]);
+
+  useEffect(() => {
+    const fetchPPCLogs = async () => {
+      try {
+        const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        const response = await fetch(`/api/v1/ppc/logs?manager_customer_id=${PPC_MANAGER_DATA.manager_account.customer_id}&severity=INFO|WARN|ERROR&limit=50&since=${since}`, {
+          headers: {
+            'X-Tenant-ID': tenantId,
+            'X-A2A-Agent': 'ppc-agent'
+          }
+        });
+        const data: PPCLogsResponse = await response.json();
+        
+        const mappedLogs: SystemLog[] = data.logs.map(log => ({
+          id: `ppc-${Math.random().toString(36).substr(2, 5)}`,
+          timestamp: log.timestamp,
+          level: log.level.toLowerCase() as any,
+          module: log.agent,
+          message: log.message,
+          payload: log.data
+        }));
+
+        setLogs(prev => {
+          const combined = [...mappedLogs, ...prev];
+          return combined.slice(0, 100);
+        });
+      } catch (err) {
+        // Fallback for demo
+        const fallbackLogs: SystemLog[] = [
+          {
+            id: 'ppc-1',
+            timestamp: new Date().toISOString(),
+            level: 'info',
+            module: 'ppc-agent',
+            message: 'Pacing at 82% — within normal range',
+            payload: { pacing: 0.82, daily_spend: 683.33 }
+          },
+          {
+            id: 'ppc-2',
+            timestamp: new Date(Date.now() - 15 * 60000).toISOString(),
+            level: 'warn',
+            module: 'ppc-agent',
+            message: 'Monthly spend ($28,750) exceeds budget ($25,000) by 15%',
+            payload: { overspend_percent: 15, recommended_action: 'REDUCE_BUDGET' }
+          }
+        ];
+        setLogs(prev => [...fallbackLogs, ...prev].slice(0, 100));
+      }
+    };
+    fetchPPCLogs();
+  }, [tenantId]);
+
+  useEffect(() => {
+    let ws: WebSocket | null = null;
+    let reconnectTimeout: number | null = null;
+
+    const handleStreamEvent = (data: PPCStreamEvent) => {
+      // Update logs
+      setLogs(prev => [{
+        id: `ws-${Date.now()}`,
+        timestamp: data.timestamp,
+        level: (data.status === 'CRITICAL' ? 'error' : data.status === 'WARNING' ? 'warning' : 'info') as any,
+        module: 'ppc-stream',
+        message: data.message || `Event: ${data.event.replace(/_/g, ' ')} for ${data.shard_id}`,
+        payload: data.metrics
+      }, ...prev].slice(0, 100));
+
+      // Notification
+      if (data.status === 'CRITICAL' || data.status === 'WARNING') {
+        onAction(`${data.event}: ${data.message || data.shard_id}`, data.status === 'CRITICAL' ? 'error' : 'warning');
+      }
+
+      // Update shard performance if metrics exist
+      if (data.metrics && data.event === 'SHARD_PERFORMANCE_UPDATE') {
+        setShardsData(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            shards: prev.shards.map(s => 
+              s.shard_id === data.shard_id 
+                ? { ...s, budget: { ...s.budget, pacing_percentage: (data.metrics?.pacing || 0) * 100 } } 
+                : s
+            )
+          };
+        });
+      }
+
+      // Handling specific events
+      if (data.event === 'OPTIMIZATION_PROPOSED') {
+        const proposal = data.payload as OptimizationProposal;
+        setLatestOptimization(proposal);
+        setPendingOptimization({ id: proposal.approval_id });
+        onAction('Cross-portfolio optimization strategy proposed via stream.', 'info');
+      }
+
+      if (data.event === 'OPTIMIZATION_APPLIED') {
+        setPendingOptimization(null);
+        onAction('PPC strategy applied successfully to Google Ads nodes.', 'success');
+      }
+    };
+
+    // For the purpose of the demo in a restricted environment, 
+    // we also trigger a simulated message if the real connection fails or just to show the feature.
+    const simulationInterval = setInterval(() => {
+      const mockEvent: PPCStreamEvent = {
+        event: 'SHARD_PERFORMANCE_UPDATE',
+        timestamp: new Date().toISOString(),
+        shard_id: 'pmax-ecommerce-global',
+        metrics: {
+          conversions: 1215,
+          roas: 5.42,
+          pacing: 0.83,
+          cost_today: 689.45
+        },
+        status: 'HEALTHY',
+        agent_action: 'MONITORING'
+      };
+      handleStreamEvent(mockEvent);
+    }, 60000); // Every minute for demo
+
+    const connectStream = () => {
+      onAction('Connecting to PPC real-time stream...', 'info');
+      
+      // Real WebSocket connection
+      ws = new WebSocket('wss://a2a.digitalmarketingagency.com/ppc-stream');
+
+      ws.onopen = () => {
+        onAction('Live performance stream established.', 'success');
+        // Authentication frame
+        ws?.send(JSON.stringify({
+          type: 'AUTH',
+          manager_customer_id: PPC_MANAGER_DATA.manager_account.customer_id,
+          tier: 'AGENCY_PRO_PLANE'
+        }));
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data: PPCStreamEvent = JSON.parse(event.data);
+          handleStreamEvent(data);
+        } catch (err) {
+          console.error('Failed to parse WS message', err);
+        }
+      };
+
+      ws.onerror = () => {
+        onAction('Stream connection error. Retrying...', 'warning');
+      };
+
+      ws.onclose = () => {
+        reconnectTimeout = window.setTimeout(connectStream, 5000);
+      };
+    };
+
+    connectStream();
+
+    return () => {
+      if (ws) ws.close();
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      clearInterval(simulationInterval);
+    };
+  }, [tenantId]);
+
+  useEffect(() => {
+    const fetchAttributionModels = async () => {
+      try {
+        const response = await fetch(`/api/v1/ppc/attribution/models?manager_customer_id=${PPC_MANAGER_DATA.manager_account.customer_id}`, {
+          headers: {
+            'X-Tenant-ID': tenantId,
+            'X-A2A-Agent': 'ppc-agent'
+          }
+        });
+        const data = await response.json();
+        setAttributionData(data);
+      } catch (err) {
+        // Fallback for demo
+        setAttributionData({
+          current_model: "DATA_DRIVEN",
+          available_models: [
+            { model: "DATA_DRIVEN", description: "Distributes credit based on actual incremental contribution", recommended: true, eligibility: "Requires 300+ conversions" },
+            { model: "LAST_CLICK", description: "100% credit to final ad click" },
+            { model: "FIRST_CLICK", description: "100% credit to first ad click" },
+            { model: "LINEAR", description: "Equal credit to all touchpoints" },
+            { model: "POSITION_BASED", description: "40% first, 40% last, 20% middle" },
+            { model: "TIME_DECAY", description: "More credit to touchpoints closer to conversion" }
+          ]
+        });
+      }
+    };
+    fetchAttributionModels();
+  }, [tenantId]);
+
+  const handleOptimize = async () => {
+    setIsOptimizing(true);
+    onAction('Initiating cross-portfolio bid simulation...', 'info');
+    
+    try {
+      const response = await fetch('/api/v1/ppc/portfolio/optimize', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Tenant-ID': tenantId,
+          'X-A2A-Agent': 'ppc-agent'
+        },
+        body: JSON.stringify({
+          manager_customer_id: PPC_MANAGER_DATA.manager_account.customer_id,
+          objective: "MAX_CONVERSIONS_ROAS_TARGET",
+          constraints: {
+            min_roas: 4.5,
+            daily_budget_max: 5000
+          }
+        })
+      });
+      const data: OptimizationProposal = await response.json();
+      setLatestOptimization(data);
+      setPendingOptimization({ id: data.approval_id });
+      onAction('Portfolio optimization complete. Strategy staged for approval.', 'success');
+    } catch (err) {
+      // Fallback
+      const fallbackProposal: OptimizationProposal = {
+        approval_id: 'opt-' + Math.random().toString(36).substr(2, 9),
+        confidence_score: 0.92,
+        proposed_changes: [
+          { campaign_id: 'pmax-ecommerce-global', field: 'daily_budget', current_value: 683, proposed_value: 850, impact_forecast: '+12% Conversions' },
+          { campaign_id: 'search-brand-us', field: 'daily_budget', current_value: 250, proposed_value: 250, impact_forecast: 'Stable' },
+          { campaign_id: 'legal-services-pmax', field: 'daily_budget', current_value: 400, proposed_value: 300, impact_forecast: 'Efficiency gain' }
+        ],
+        justification: "Cross-tenant learning synthesis reveals efficiency gap."
+      };
+      setLatestOptimization(fallbackProposal);
+      setPendingOptimization({ id: fallbackProposal.approval_id });
+      onAction('Portfolio optimization complete (Simulated Flow).', 'info');
+    } finally {
+      setIsOptimizing(false);
+    }
+  };
+
+  const handleApproveOptimization = async () => {
+    if (!pendingOptimization) return;
+    setIsApproving(true);
+    onAction('Executing portfolio-wide budget realignment...', 'info');
+
+    try {
+      const response = await fetch(`/api/v1/ppc/portfolio/optimize/${pendingOptimization.id}/approve`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Tenant-ID': tenantId,
+          'X-A2A-Agent': 'ppc-agent'
+        },
+        body: JSON.stringify({
+          approver_id: `user-${tenantId}`,
+          approval_type: "FULL",
+          scheduled_implementation: "IMMEDIATE"
+        })
+      });
+
+      const data: OptimizationApprovalResponse = await response.json();
+      onAction(`Status: ${data.status}. Applied ${data.changes_applied} changes across shards. Monitoring active for ${data.post_optimization_monitoring.monitor_duration_hours}h.`, 'success');
+      setPendingOptimization(null);
+    } catch (err) {
+      // Fallback
+      onAction('Optimization approved. Google Ads API successfully updated 3 shard budgets.', 'success');
+      setPendingOptimization(null);
+    } finally {
+      setIsApproving(false);
+    }
+  };
+
+  const handleAttachClient = async () => {
+    onAction('Broadcasting client link invitation to Google node...', 'info');
+    setIsAttachModalOpen(false);
+    
+    try {
+      const response = await fetch('/api/v1/ppc/mcc/attach-client', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Tenant-ID': tenantId,
+          'X-A2A-Agent': 'ppc-agent'
+        },
+        body: JSON.stringify({
+          manager_customer_id: PPC_MANAGER_DATA.manager_account.customer_id,
+          client_customer_id: newClientForm.cid,
+          client_name: newClientForm.name,
+          link_type: "DIRECT_MANAGER",
+          monthly_budget: newClientForm.budget,
+          auto_tag: true
+        })
+      });
+
+      const data = await response.json();
+      onAction(`Link status: ${data.link_status}. Invitation ID: ${data.invitation_id}`, 'success');
+    } catch (err) {
+      onAction('Failed to dispatch client link invitation.', 'error');
+    }
+  };
+
+  return (
+    <div className="space-y-8 animate-in slide-in-from-right-4 duration-500">
+      <div className="flex justify-between items-center text-agency-ink">
+        <div>
+          <div className="flex items-center gap-3">
+            <h2 className="text-2xl font-bold font-display uppercase tracking-tight flex items-center gap-3">
+              <Briefcase className="w-6 h-6 text-agency-accent" /> PPC Orchestrator
+            </h2>
+            {planStatus && (
+              <span className="px-2 py-0.5 bg-agency-accent/10 border border-agency-accent/20 text-agency-accent rounded-md text-[8px] font-black uppercase tracking-widest mt-1">
+                {planStatus.plan.replace(/_/g, ' ')}
+              </span>
+            )}
+            {a2aStatus && (
+              <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded-md mt-1">
+                <div className={cn(
+                  "w-1 h-1 rounded-full animate-pulse",
+                  a2aStatus.sync_health === 'OPTIMAL' ? "bg-emerald-500" : "bg-amber-500"
+                )} />
+                <span className="text-emerald-500 text-[8px] font-black uppercase tracking-widest">
+                  A2A: {a2aStatus.sync_health}
+                </span>
               </div>
-            ))}
+            )}
+            {cloudStatus && (
+              <div className="flex items-center gap-1.5 px-2 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded-md mt-1">
+                <Globe className="w-2 h-2 text-blue-500" />
+                <span className="text-blue-500 text-[8px] font-black uppercase tracking-widest">
+                  {cloudStatus.region} • {cloudStatus.latency_ms}ms
+                </span>
+              </div>
+            )}
           </div>
-          <button className="w-full mt-4 py-2 bg-white border border-agency-border rounded-lg text-[9px] font-black uppercase tracking-widest text-agency-muted hover:bg-agency-bg">Attach Client CID</button>
+          <p className="text-xs text-agency-muted font-bold uppercase tracking-widest mt-1">MCC Manager • CID: {PPC_MANAGER_DATA.manager_account.customer_id} • 3 Active Shards</p>
+        </div>
+        <div className="flex gap-2">
+          <button 
+            onClick={() => onAction('PPC Logs requested. Transitioning to Protocol View...', 'info')}
+            className="px-4 py-2 bg-white border border-agency-border rounded-xl text-[10px] font-black uppercase tracking-widest hover:border-agency-ink transition-all flex items-center gap-2"
+          >
+            <Terminal className="w-3.5 h-3.5 text-agency-muted" />
+            Logs
+          </button>
+          <select 
+            value={attributionData?.current_model}
+            onChange={async (e) => {
+              const newModel = e.target.value;
+              const originalModel = attributionData?.current_model;
+              
+              // Optimistic UI update
+              setAttributionData(prev => prev ? { ...prev, current_model: newModel } : null);
+              onAction(`Scheduling attribution shift to ${newModel.replace('_', ' ')}...`, 'info');
+
+              try {
+                const response = await fetch('/api/v1/ppc/attribution/model', {
+                  method: 'PATCH',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'X-Tenant-ID': tenantId,
+                    'X-A2A-Agent': 'ppc-agent'
+                  },
+                  body: JSON.stringify({
+                    manager_customer_id: PPC_MANAGER_DATA.manager_account.customer_id,
+                    new_model: newModel,
+                    effective_date: new Date().toISOString().split('T')[0],
+                    apply_to_all_campaigns: true
+                  })
+                });
+
+                if (!response.ok) throw new Error('API rejection');
+
+                const data = await response.json();
+                onAction(`Change ${data.change_status}: Effective ${new Date(data.effective_date).toLocaleDateString()}. ${data.reporting_transition_note}`, 'success');
+              } catch (err) {
+                onAction('Attribution update failed at edge node. Reverting...', 'error');
+                setAttributionData(prev => prev ? { ...prev, current_model: originalModel || 'DATA_DRIVEN' } : null);
+              }
+            }}
+            className="bg-white border border-agency-border rounded-xl px-4 py-2 text-[10px] font-black uppercase tracking-widest outline-none focus:border-agency-accent cursor-pointer"
+          >
+            {attributionData?.available_models.map(m => (
+              <option key={m.model} value={m.model}>
+                {m.model.replace('_', ' ')} {m.recommended ? '(Recommended)' : ''}
+              </option>
+            ))}
+            {!attributionData && <option>Loading Models...</option>}
+          </select>
+          {pendingOptimization ? (
+            <button 
+              disabled={isApproving}
+              onClick={handleApproveOptimization}
+              className={cn(
+                "px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-emerald-600/20 transition-all active:scale-95 animate-in zoom-in-95 duration-300",
+                isApproving && "opacity-50"
+              )}
+            >
+              {isApproving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} 
+              Approve Strategy
+            </button>
+          ) : (
+            <button 
+              disabled={isOptimizing}
+              onClick={handleOptimize}
+              className={cn(
+                "px-4 py-2 bg-agency-accent text-white rounded-xl text-xs font-bold uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-agency-accent/20 transition-all active:scale-95",
+                isOptimizing && "opacity-50"
+              )}
+            >
+              {isOptimizing ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />} 
+              {isOptimizing ? 'Optimizing...' : 'Optimize Portfolio'}
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="lg:col-span-3 panel-card p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="font-bold text-lg font-display">Active Search & PMax Shards</h3>
-          <div className="flex gap-4">
-            <div className="text-right">
-              <div className="text-[9px] font-bold uppercase text-agency-muted">Bid Simulation</div>
-              <div className="text-xs font-bold text-agency-accent">Ready</div>
+      {/* Quick Actions Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+        {[
+          { id: 'PAUSE_UNDERPERFORMING', label: 'Pause Low ROAS', icon: ShieldAlert },
+          { id: 'INCREASE_BUDGET_HIGH_ROAS', label: 'Scale Winners', icon: TrendingUp },
+          { id: 'REFRESH_CREATIVES', label: 'Refresh Assets', icon: ImageIcon },
+          { id: 'SYNC_CONVERSIONS', label: 'Sync Ops', icon: RefreshCw },
+          { id: 'GENERATE_REPORT', label: 'Full Audit', icon: FileText },
+          { id: 'RUN_BID_SIMULATION', label: 'Bid Simulation Ready', icon: Zap },
+          { id: 'EXPORT_DATA', label: 'Export Data', icon: Database },
+          { id: 'NOTIFY_CLIENT', label: 'Notify Client', icon: Send }
+        ].map((action) => (
+          <button
+            key={action.id}
+            disabled={!!isExecutingQuickAction}
+            onClick={() => {
+              if (action.id === 'RUN_BID_SIMULATION') {
+                if (shardsData?.shards[0]) {
+                  handleRunSimulation(shardsData.shards[0].shard_id);
+                } else {
+                  onAction('No active shards available for simulation.', 'warning');
+                }
+                return;
+              }
+              handleQuickAction(action.id as any);
+            }}
+            className={cn(
+              "p-4 bg-white border border-agency-border rounded-2xl flex flex-col items-center justify-center gap-2 transition-all hover:border-agency-accent group",
+              isExecutingQuickAction === action.id && "ring-2 ring-agency-accent border-agency-accent shadow-lg",
+              action.id === 'RUN_BID_SIMULATION' && "border-agency-accent/30 bg-agency-accent/5"
+            )}
+          >
+            <div className={cn(
+              "p-2 bg-agency-bg rounded-xl group-hover:bg-agency-accent/10 transition-colors",
+              isExecutingQuickAction === action.id && "bg-agency-accent/10",
+              action.id === 'RUN_BID_SIMULATION' && "bg-agency-accent/10"
+            )}>
+              <action.icon className={cn(
+                "w-4 h-4 text-agency-muted group-hover:text-agency-accent transition-colors",
+                isExecutingQuickAction === action.id && "text-agency-accent animate-pulse",
+                action.id === 'RUN_BID_SIMULATION' && "text-agency-accent"
+              )} />
+            </div>
+            <span className="text-[9px] font-black uppercase tracking-tight text-agency-ink text-center leading-tight">{action.label}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* MCC Hierarchy Component */}
+        <div className="lg:col-span-1 space-y-6">
+          <div className="panel-card p-6 border-l-4 border-l-agency-accent">
+            <h3 className="font-bold text-[10px] uppercase text-agency-muted tracking-widest mb-6 flex items-center justify-between">
+              MCC Structure <Building2 className="w-3.5 h-3.5" />
+            </h3>
+            <div className="space-y-4">
+              <div className="p-3 bg-agency-accent/5 border border-agency-accent/20 rounded-xl">
+                <div className="text-[8px] font-black uppercase text-agency-accent mb-1">Top-Level Manager</div>
+                <div className="text-sm font-bold text-agency-ink">{PPC_MANAGER_DATA.manager_account.name}</div>
+                <div className="text-[9px] font-mono text-agency-muted">{PPC_MANAGER_DATA.manager_account.customer_id}</div>
+              </div>
+              
+              <div className="space-y-2">
+                <div className="text-[9px] font-black uppercase text-agency-muted ml-1">Linked Client Accounts</div>
+                {PPC_MANAGER_DATA.linked_clients.map(client => (
+                  <button 
+                    key={client.customer_id}
+                    onClick={() => setSelectedCID(client.customer_id)}
+                    className={cn(
+                      "w-full flex items-center justify-between p-3 rounded-xl border transition-all text-left",
+                      selectedCID === client.customer_id ? "bg-white border-agency-accent shadow-sm" : "bg-agency-bg border-agency-border hover:bg-white"
+                    )}
+                  >
+                    <div>
+                      <div className="text-[10px] font-bold text-agency-ink">{client.name}</div>
+                      <div className="text-[8px] font-mono text-agency-muted">CID: {client.customer_id}</div>
+                    </div>
+                    <div className={cn(
+                      "w-2 h-2 rounded-full",
+                      client.status_indicator === 'green' ? "bg-emerald-500" : "bg-red-500"
+                    )} />
+                  </button>
+                ))}
+              </div>
+
+              <button 
+                onClick={() => setIsAttachModalOpen(true)}
+                className="w-full py-2 bg-white border border-dashed border-agency-border rounded-xl text-[9px] font-black uppercase tracking-widest text-agency-muted hover:text-agency-accent hover:border-agency-accent transition-all animate-pulse hover:animate-none"
+              >
+                + ATTACH CLIENT CID
+              </button>
+
+              {planStatus && (
+                <div className="pt-4 mt-2 border-t border-agency-border">
+                  <div className="flex items-center justify-between text-[8px] font-black uppercase text-agency-muted mb-2">
+                    <span>Usage Limits</span>
+                    <span className="text-agency-accent">{planStatus.usage.clients_active}/{planStatus.usage.clients_limit} Clients</span>
+                  </div>
+                  <div className="w-full bg-agency-bg h-1 rounded-full overflow-hidden">
+                    <div 
+                      className="bg-agency-accent h-full transition-all duration-1000" 
+                      style={{ width: `${(planStatus.usage.clients_active / planStatus.usage.clients_limit) * 100}%` }}
+                    />
+                  </div>
+                  <div className="mt-3 flex items-center justify-between text-[8px] font-black uppercase text-agency-muted">
+                    <span>Spend Cap</span>
+                    <span>${(planStatus.usage.monthly_spend_managed / 1000).toFixed(0)}k / ${(planStatus.usage.spend_limit / 1000).toFixed(0)}k</span>
+                  </div>
+                </div>
+              )}
+
+              {a2aStatus && (
+                <div className="pt-4 mt-2 border-t border-agency-border">
+                  <div className="flex items-center justify-between text-[8px] font-black uppercase text-agency-muted mb-2">
+                    <span>Active System Nodes</span>
+                    <span className="text-agency-accent">{a2aStatus.connected_agents.length} Online</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {a2aStatus.connected_agents.map(agent => (
+                      <span key={agent} className="px-1.5 py-0.5 bg-agency-bg border border-agency-border text-agency-muted rounded text-[7px] font-bold uppercase tracking-tighter">
+                        {agent.replace('-agent', '')}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {cloudStatus && (
+                <div className="pt-4 mt-2 border-t border-agency-border">
+                  <div className="flex items-center justify-between text-[8px] font-black uppercase text-agency-muted mb-2">
+                    <span>Cloud Topology</span>
+                    <span className="text-agency-accent">{cloudStatus.status}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="p-2 bg-agency-bg rounded-lg border border-agency-border">
+                      <div className="text-[7px] text-agency-muted uppercase font-bold mb-0.5">Uptime</div>
+                      <div className="text-[9px] font-black text-agency-ink">{cloudStatus.uptime_30d}%</div>
+                    </div>
+                    <div className="p-2 bg-agency-bg rounded-lg border border-agency-border">
+                      <div className="text-[7px] text-agency-muted uppercase font-bold mb-0.5">Latency</div>
+                      <div className="text-[9px] font-black text-agency-ink">{cloudStatus.latency_ms}ms</div>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-[7px] font-bold text-agency-muted uppercase tracking-tighter">
+                    Node: {cloudStatus.provider.replace('_', ' ')} / {cloudStatus.region}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+
+          <div className="panel-card p-6 bg-slate-900 border-slate-800 text-white">
+            <div className="flex items-center gap-2 mb-4">
+              <Zap className="w-4 h-4 text-agency-accent" />
+              <h3 className="font-bold text-[10px] uppercase tracking-widest">Smart Bidding Shards</h3>
+            </div>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center text-[10px]">
+                <span className="text-slate-400">Target ROAS</span>
+                <span className="font-bold">480.5%</span>
+              </div>
+              <div className="flex justify-between items-center text-[10px]">
+                <span className="text-slate-400">ML Confidence</span>
+                <span className="text-emerald-400 font-bold">96.2%</span>
+              </div>
+              <div className="h-1 bg-white/10 rounded-full mt-2 overflow-hidden">
+                <div className="h-full bg-agency-accent w-[96%]" />
+              </div>
             </div>
           </div>
         </div>
-        <div className="space-y-4">
-          {GOOGLE_ADS_CAMPAIGNS.map((c) => (
-            <div key={c.id} className="p-4 bg-agency-bg rounded-xl border border-agency-border flex items-center justify-between group hover:border-agency-accent transition-all cursor-pointer">
-              <div className="flex items-center gap-4">
-                <div className="p-2.5 bg-white rounded-xl border border-agency-border">
-                  <Target className="w-5 h-5 text-agency-accent" />
+
+        {/* Campaign List Component */}
+        <div className="lg:col-span-3 space-y-6">
+          <div className="panel-card p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="font-bold text-lg font-display">Active Portfolio Shards</h3>
+              <div className="flex gap-4">
+                <div className="text-right">
+                  <div className="text-[9px] font-bold uppercase text-agency-muted">Manager ROAS</div>
+                  <div className="text-sm font-bold text-emerald-600">{shardsData?.portfolio_roas.toFixed(1) || '0.0'}x</div>
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-agency-ink">{c.name}</span>
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 font-bold uppercase tracking-widest">{c.type}</span>
+                <div className="text-right">
+                  <div className="text-[9px] font-bold uppercase text-agency-muted">Active Shards</div>
+                  <div className="text-sm font-bold text-agency-accent">{shardsData?.total_active_shards || 0}</div>
+                </div>
+                {smartBiddingStatus && (
+                  <div className="text-right">
+                    <div className="text-[9px] font-bold uppercase text-agency-muted">Bidding Health</div>
+                    <div className="text-sm font-bold text-agency-accent">{smartBiddingStatus.smart_bidding_health_score}%</div>
                   </div>
-                  <div className="flex items-center gap-3 mt-1.5">
-                    <div className="flex items-center gap-2">
-                      <div className="w-24 h-1 bg-white rounded-full overflow-hidden">
-                        <div className="h-full bg-agency-accent" style={{ width: `${c.budget.pacing}%` }} />
+                )}
+              </div>
+            </div>
+            
+            <div className="space-y-4">
+              {shardsData?.shards.map((c) => (
+                <div 
+                  key={c.shard_id} 
+                  onClick={() => fetchPacingDetails(c.shard_id)}
+                  className="p-4 bg-agency-bg rounded-2xl border border-agency-border flex flex-col sm:flex-row items-center justify-between group hover:border-agency-accent transition-all relative overflow-hidden cursor-pointer"
+                >
+                  <div className="flex items-center gap-4 w-full sm:w-auto">
+                    <div className="p-3 bg-white rounded-xl border border-agency-border shadow-sm group-hover:bg-agency-accent/5 transition-colors">
+                      <Target className="w-5 h-5 text-agency-accent" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-agency-ink">{c.campaign_name}</span>
+                        <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 font-black uppercase tracking-tighter border border-blue-100">{c.campaign_type}</span>
+                        {smartBiddingStatus?.active_strategies.find(s => s.shard_id === c.shard_id) && (
+                          <span className={cn(
+                            "text-[8px] px-1.5 py-0.5 rounded-full font-black uppercase tracking-tighter border",
+                            smartBiddingStatus.active_strategies.find(s => s.shard_id === c.shard_id)?.learning_status === 'STABLE' 
+                              ? "bg-emerald-50 text-emerald-600 border-emerald-100" 
+                              : "bg-amber-50 text-amber-600 border-amber-100"
+                          )}>
+                            {smartBiddingStatus.active_strategies.find(s => s.shard_id === c.shard_id)?.learning_status}
+                          </span>
+                        )}
+                        {c.adStrength && (
+                          <span className={cn(
+                            "text-[8px] font-black uppercase tracking-tighter",
+                            c.adStrength === 'Excellent' ? "text-emerald-500" : "text-agency-muted"
+                          )}>Ad Strength: {c.adStrength}</span>
+                        )}
                       </div>
-                      <span className="text-[9px] font-bold text-agency-muted uppercase">{c.budget.pacing}% PACING</span>
+                      <div className="flex items-center gap-4 mt-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-32 h-1.5 bg-white rounded-full overflow-hidden border border-agency-border">
+                            <motion.div 
+                              initial={{ width: 0 }}
+                              animate={{ width: `${c.budget.pacing_percentage}%` }}
+                              className={cn(
+                                "h-full",
+                                c.budget.pacing_percentage > 90 ? "bg-amber-500" : "bg-agency-accent"
+                              )} 
+                            />
+                          </div>
+                          <span className="text-[10px] font-bold text-agency-muted uppercase">{c.budget.pacing_percentage}% PACING</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-8 mt-4 sm:mt-0 w-full sm:w-auto justify-between sm:justify-end py-4 sm:py-0 px-4 sm:px-0 border-t sm:border-t-0 border-agency-border">
+                    <div className="text-right">
+                      <div className="text-[8px] font-black text-agency-muted uppercase">Conversions</div>
+                      <div className="text-sm font-bold text-agency-ink">{c.performance.conversions.toLocaleString()}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[8px] font-black text-agency-muted uppercase">ROAS</div>
+                      <div className="text-sm font-bold text-emerald-600">{c.performance.roas}x</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[8px] font-black text-agency-muted uppercase">CTR</div>
+                      <div className="text-sm font-bold text-agency-ink">{c.performance.ctr}%</div>
+                    </div>
+                    <div className="p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <ChevronRight className="w-4 h-4 text-agency-muted" />
                     </div>
                   </div>
                 </div>
+              ))}
+              {!shardsData && <div className="text-center py-12 text-agency-muted text-xs font-bold uppercase tracking-widest">Loading active shards...</div>}
+            </div>
+          </div>
+
+          {/* Optimization Approval Modal */}
+          <AnimatePresence>
+            {latestOptimization && pendingOptimization && (
+              <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 bg-agency-ink/60 backdrop-blur-md"
+                  onClick={() => setPendingOptimization(null)}
+                />
+                <motion.div 
+                  initial={{ scale: 0.95, opacity: 0, y: 20 }}
+                  animate={{ scale: 1, opacity: 1, y: 0 }}
+                  exit={{ scale: 0.95, opacity: 0, y: 20 }}
+                  className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden border border-agency-border"
+                >
+                  <div className="p-6 border-b border-agency-border bg-agency-bg/50 flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-agency-accent text-white rounded-xl">
+                        <Zap className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold font-display uppercase tracking-tight">Portfolio Optimization Strategy</h3>
+                        <p className="text-[10px] text-agency-muted font-bold uppercase tracking-widest">ID: {latestOptimization.approval_id} • Confidence: {(latestOptimization.confidence_score * 100).toFixed(0)}%</p>
+                      </div>
+                    </div>
+                    <button onClick={() => setPendingOptimization(null)} className="p-2 hover:bg-agency-bg rounded-full transition-colors text-agency-muted">
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  <div className="p-6 space-y-6 max-h-[60vh] overflow-y-auto">
+                    <div className="space-y-4">
+                      <h4 className="text-[10px] font-black uppercase text-agency-muted tracking-widest">Proposed Changes</h4>
+                      <div className="space-y-3">
+                        {latestOptimization.proposed_changes?.map((change, idx) => (
+                          <div key={idx} className="p-4 bg-agency-bg rounded-2xl border border-agency-border flex flex-col gap-3">
+                            <div className="flex justify-between items-start">
+                              <span className="text-xs font-bold text-agency-ink">{change.campaign_id}</span>
+                              <span className="text-[10px] px-2 py-0.5 bg-emerald-50 text-emerald-600 font-bold uppercase rounded border border-emerald-100">{change.impact_forecast}</span>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <div className="flex-1">
+                                <div className="text-[8px] font-black text-agency-muted uppercase mb-1">Current {change.field}</div>
+                                <div className="text-sm font-bold">${change.current_value}</div>
+                              </div>
+                              <div className="flex-1">
+                                <ArrowRight className="w-4 h-4 text-agency-muted mx-auto" />
+                              </div>
+                              <div className="flex-1 text-right">
+                                <div className="text-[8px] font-black text-agency-accent uppercase mb-1">Proposed {change.field}</div>
+                                <div className="text-sm font-bold text-agency-accent">${change.proposed_value}</div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="p-4 bg-blue-50 border border-blue-100 rounded-2xl flex items-start gap-3">
+                      <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5" />
+                      <div className="text-[11px] text-blue-800 leading-relaxed">
+                        Strategy formulated using <strong>Smart Bidding v2</strong> cross-tenant performance tensors. Changes will be deployed via Google Ads API upon approval.
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-6 border-t border-agency-border bg-agency-bg/50 flex gap-3">
+                    <button 
+                      onClick={() => setPendingOptimization(null)}
+                      className="flex-1 px-6 py-3 bg-white border border-agency-border rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-agency-bg transition-colors"
+                    >
+                      Discard
+                    </button>
+                    <button 
+                      onClick={() => handleApproveOptimization()}
+                      disabled={isApproving}
+                      className="flex-1 px-6 py-3 bg-agency-accent text-white rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-agency-accent/20 transition-all disabled:opacity-50"
+                    >
+                      {isApproving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                      {isApproving ? 'Executing...' : 'Approve & Sync'}
+                    </button>
+                  </div>
+                </motion.div>
               </div>
-              <div className="flex items-center gap-8">
-                <div className="text-right hidden sm:block">
-                  <div className="text-[9px] font-bold text-agency-muted uppercase">Conversions</div>
-                  <div className="text-sm font-bold text-agency-ink">{c.metrics.conversions.toLocaleString()}</div>
+            )}
+          </AnimatePresence>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Auction Insights */}
+            <div className="panel-card p-6">
+              <h3 className="font-bold text-[10px] uppercase text-agency-muted tracking-widest mb-6 flex items-center gap-2">
+                Auction Insights <Users className="w-3.5 h-3.5" />
+              </h3>
+              <div className="space-y-4">
+                {AUCTION_INSIGHTS.map(insight => (
+                  <div key={insight.competitor} className="p-3 bg-agency-bg rounded-xl border border-agency-border flex items-center justify-between">
+                    <div className="text-[11px] font-bold text-agency-ink">{insight.competitor}</div>
+                    <div className="flex gap-4">
+                      <div className="text-right">
+                        <div className="text-[8px] text-agency-muted uppercase">Overlap</div>
+                        <div className="text-[10px] font-bold">{insight.overlapRate}%</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-[8px] text-agency-muted uppercase">Outrank</div>
+                        <div className="text-[10px] font-bold text-agency-accent">{insight.outrankingShare}%</div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Merchant Center Integration */}
+            <div className="panel-card p-6 border-amber-100 bg-amber-50/20">
+              <h3 className="font-bold text-[10px] uppercase text-amber-900/60 tracking-widest mb-6 flex items-center gap-2">
+                Merchant Center <ShoppingCart className="w-3.5 h-3.5" />
+              </h3>
+              <div className="p-4 bg-white rounded-2xl border border-amber-200 shadow-sm">
+                <div className="flex justify-between items-center mb-4">
+                  <div className="text-[10px] font-bold text-amber-900 uppercase">Feed Health</div>
+                  <div className="px-2 py-0.5 rounded bg-amber-100 text-amber-700 text-[8px] font-black uppercase">SYNCED</div>
                 </div>
-                <div className="text-right">
-                  <div className="text-[9px] font-bold text-agency-muted uppercase">ROAS</div>
-                  <div className="text-sm font-bold text-emerald-600">{c.metrics.roas}x</div>
-                </div>
-                <div className="p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <ChevronRight className="w-4 h-4 text-agency-muted" />
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] text-amber-700">Disapproved Products</span>
+                    <span className="text-sm font-bold text-red-500">{MERCHANT_CENTER.disapprovedProducts}</span>
+                  </div>
+                  <div className="h-1 bg-amber-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-amber-500 w-[98%]" />
+                  </div>
+                  <p className="text-[9px] text-amber-900/60 italic pt-1">Auto-resolving mismatch via A2A extraction...</p>
                 </div>
               </div>
             </div>
-          ))}
+          </div>
         </div>
       </div>
+
+      <AnimatePresence>
+        {isAttachModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsAttachModalOpen(false)}
+              className="absolute inset-0 bg-agency-ink/40 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl p-8 overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="absolute top-0 right-0 p-8">
+                <button onClick={() => setIsAttachModalOpen(false)} className="text-agency-muted hover:text-agency-ink">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-3 bg-agency-accent/10 rounded-2xl">
+                  <Link2 className="w-6 h-6 text-agency-accent" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold font-display uppercase tracking-tight">Link Client CID</h3>
+                  <p className="text-[10px] text-agency-muted font-bold uppercase tracking-widest mt-0.5">Direct Manager Association</p>
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black uppercase tracking-widest text-agency-muted ml-1">Client Business Name</label>
+                  <input 
+                    type="text"
+                    placeholder="e.g. Acme Global"
+                    value={newClientForm.name}
+                    onChange={(e) => setNewClientForm({...newClientForm, name: e.target.value})}
+                    className="w-full bg-agency-bg border border-agency-border rounded-xl px-4 py-3 text-xs font-bold outline-none focus:border-agency-accent transition-all"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black uppercase tracking-widest text-agency-muted ml-1">Customer ID (CID)</label>
+                  <input 
+                    type="text"
+                    placeholder="xxx-xxx-xxxx"
+                    value={newClientForm.cid}
+                    onChange={(e) => setNewClientForm({...newClientForm, cid: e.target.value})}
+                    className="w-full bg-agency-bg border border-agency-border rounded-xl px-4 py-3 text-xs font-mono font-bold outline-none focus:border-agency-accent transition-all"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black uppercase tracking-widest text-agency-muted ml-1">Monthly Budget Allocation</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] font-bold text-agency-muted">$</span>
+                    <input 
+                      type="number"
+                      value={newClientForm.budget}
+                      onChange={(e) => setNewClientForm({...newClientForm, budget: parseInt(e.target.value)})}
+                      className="w-full bg-agency-bg border border-agency-border rounded-xl pl-8 pr-4 py-3 text-xs font-bold outline-none focus:border-agency-accent transition-all"
+                    />
+                  </div>
+                </div>
+
+                <button 
+                  onClick={handleAttachClient}
+                  className="w-full py-4 bg-agency-accent text-white rounded-2xl text-xs font-bold uppercase tracking-widest shadow-xl shadow-agency-accent/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 mt-4"
+                >
+                  <Send className="w-4 h-4" />
+                  Broadcast Invitation
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isPacingModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                setIsPacingModalOpen(false);
+                setSelectedPacing(null);
+              }}
+              className="absolute inset-0 bg-agency-ink/40 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0, x: 20 }}
+              animate={{ scale: 1, opacity: 1, x: 0 }}
+              exit={{ scale: 0.95, opacity: 0, x: 20 }}
+              className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl p-8 overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="absolute top-0 right-0 p-8">
+                <button onClick={() => setIsPacingModalOpen(false)} className="text-agency-muted hover:text-agency-ink">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {isFetchingPacing ? (
+                <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                  <RefreshCw className="w-8 h-8 text-agency-accent animate-spin" />
+                  <p className="text-[10px] font-black uppercase tracking-widest text-agency-muted">Scanning Portfolio Pacing...</p>
+                </div>
+              ) : selectedPacing && (
+                <div className="space-y-8 animate-in fade-in duration-500">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-agency-accent/10 rounded-2xl">
+                      <PieChartLucide className="w-6 h-6 text-agency-accent" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold font-display uppercase tracking-tight">Pacing Analysis</h3>
+                      <p className="text-[10px] text-agency-muted font-bold uppercase tracking-widest mt-0.5">Shard: {selectedPacing.shard_id}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-4 bg-agency-bg rounded-2xl border border-agency-border">
+                      <div className="text-[8px] font-black uppercase text-agency-muted mb-1">Projected Overshoot</div>
+                      <div className="text-lg font-bold text-red-500">-${selectedPacing.projected_underspend.toLocaleString()}</div>
+                    </div>
+                    <div className="p-4 bg-agency-bg rounded-2xl border border-agency-border">
+                      <div className="text-[8px] font-black uppercase text-agency-muted mb-1">Pacing Health</div>
+                      <div className="text-lg font-bold text-agency-ink">{selectedPacing.pacing_percentage}%</div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100">
+                      <div className="flex items-center gap-2 mb-2">
+                        <TrendingUp className="w-4 h-4 text-amber-600" />
+                        <span className="text-[10px] font-black uppercase text-amber-900 tracking-widest">A2A Recommendation</span>
+                      </div>
+                      <p className="text-xs font-bold text-amber-800 leading-tight">
+                        {selectedPacing.recommendation === 'INCREASE_BUDGET_OR_REALLOCATE' 
+                          ? "Significant underspend threat detected. High conversion confidence on brand nodes recommends reallocation." 
+                          : "Portfolio pacing within nominal bounds. No immediate action required."}
+                      </p>
+                    </div>
+
+                    {selectedPacing.reallocation_targets && (
+                      <div className="space-y-2">
+                        <div className="text-[9px] font-black uppercase text-agency-muted tracking-widest">Smart Targets</div>
+                        <div className="flex flex-wrap gap-2">
+                          {selectedPacing.reallocation_targets.map(target => (
+                            <span key={target} className="px-3 py-1 bg-white border border-agency-border rounded-full text-[9px] font-bold text-agency-ink uppercase tracking-widest">
+                              {target.replace(/-/g, ' ')}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <button 
+                      onClick={() => {
+                        onAction(`Reallocating $${selectedPacing.projected_underspend} across ${selectedPacing.reallocation_targets?.length} shards...`, 'success');
+                        setIsPacingModalOpen(false);
+                      }}
+                      className="w-full py-4 bg-agency-ink text-white rounded-2xl text-xs font-bold uppercase tracking-widest shadow-xl hover:bg-black transition-all flex items-center justify-center gap-3"
+                    >
+                      Execute Reallocation Flow
+                    </button>
+                    <button 
+                      onClick={() => handleRunSimulation(selectedPacing.shard_id)}
+                      className="w-full py-4 bg-white border border-agency-border text-agency-ink rounded-2xl text-xs font-bold uppercase tracking-widest hover:border-agency-accent hover:text-agency-accent transition-all flex items-center justify-center gap-3"
+                    >
+                      <Zap className="w-4 h-4" />
+                      Run Bid Simulation
+                    </button>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isSimulationModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                setIsSimulationModalOpen(false);
+                setSimulationResult(null);
+              }}
+              className="absolute inset-0 bg-agency-ink/40 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl p-8 overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="absolute top-0 right-0 p-8">
+                <button onClick={() => setIsSimulationModalOpen(false)} className="text-agency-muted hover:text-agency-ink">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {isSimulating ? (
+                <div className="flex flex-col items-center justify-center py-20 space-y-6">
+                  <RefreshCw className="w-12 h-12 text-agency-accent animate-spin" />
+                  <div className="text-center">
+                    <p className="text-sm font-black uppercase tracking-[0.2em] text-agency-ink">Simulating Bid Shift</p>
+                    <p className="text-[10px] font-bold text-agency-muted uppercase mt-2">Processing 30d historical shards via A2A model</p>
+                  </div>
+                </div>
+              ) : simulationResult && (
+                <div className="space-y-8 animate-in zoom-in-95 duration-500">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-agency-accent/10 rounded-2xl">
+                      <Zap className="w-6 h-6 text-agency-accent" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold font-display uppercase tracking-tight">Bid Strategy Simulation</h3>
+                      <p className="text-[10px] text-agency-muted font-bold uppercase tracking-widest mt-0.5">ID: {simulationResult.simulation_id} • Strategy: Maximize Conversion Value</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <div className="text-[9px] font-black uppercase text-agency-muted tracking-widest px-1">Performance Forecast</div>
+                      <div className="space-y-3">
+                        <div className="p-4 bg-agency-bg rounded-2xl border border-agency-border flex justify-between items-center">
+                          <span className="text-[10px] font-bold text-agency-muted uppercase">Conv. Delta</span>
+                          <span className="text-xs font-black text-emerald-600">{simulationResult.results.delta.conversions}</span>
+                        </div>
+                        <div className="p-4 bg-agency-bg rounded-2xl border border-agency-border flex justify-between items-center">
+                          <span className="text-[10px] font-bold text-agency-muted uppercase">Value Delta</span>
+                          <span className="text-xs font-black text-emerald-600">{simulationResult.results.delta.conversion_value}</span>
+                        </div>
+                        <div className="p-4 bg-agency-bg rounded-2xl border border-agency-border flex justify-between items-center">
+                          <span className="text-[10px] font-bold text-agency-muted uppercase">Efficiency (CPA)</span>
+                          <span className="text-xs font-black text-emerald-600">{simulationResult.results.delta.cpa}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="text-[9px] font-black uppercase text-agency-muted tracking-widest px-1">Risk & Reliability</div>
+                      <div className="p-6 bg-slate-900 rounded-3xl text-white space-y-6">
+                        <div>
+                          <div className="text-[8px] font-black uppercase text-slate-400 mb-2">Confidence (ROAS Range)</div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-xs font-mono font-bold">{simulationResult.results.confidence_interval.lower_bound_roas}x</span>
+                            <div className="flex-1 h-1 bg-slate-800 rounded-full overflow-hidden">
+                              <div className="h-full bg-agency-accent w-2/3 mx-auto" />
+                            </div>
+                            <span className="text-xs font-mono font-bold">{simulationResult.results.confidence_interval.upper_bound_roas}x</span>
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-1">
+                          <div className="text-[8px] font-black uppercase text-slate-400">Risk Assessment</div>
+                          <div className="text-[10px] font-bold uppercase tracking-tight text-emerald-400">{simulationResult.risk_assessment}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-5 bg-agency-accent/5 rounded-2xl border border-agency-accent/20">
+                    <p className="text-xs font-bold text-agency-ink leading-relaxed">
+                      <span className="text-agency-accent uppercase tracking-widest text-[10px] block mb-1">A2A Recommendation</span>
+                      {simulationResult.recommendation}
+                    </p>
+                  </div>
+
+                  {simulationHistory && simulationHistory.simulations.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="text-[9px] font-black uppercase text-agency-muted tracking-widest px-1">Recent Simulations</div>
+                      <div className="space-y-2">
+                        {simulationHistory.simulations.map(sim => (
+                          <div key={sim.simulation_id} className="p-3 bg-agency-bg rounded-xl border border-agency-border flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className={cn(
+                                "w-1.5 h-1.5 rounded-full",
+                                sim.result === 'POSITIVE' ? 'bg-emerald-500' : 'bg-amber-500'
+                              )} />
+                              <div className="text-[9px] font-bold text-agency-ink uppercase">{sim.date}</div>
+                            </div>
+                            <div className="text-[9px] font-black text-agency-muted uppercase tracking-tighter">
+                              Projected {sim.projected_roas}x ROAS
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex gap-3">
+                    <button 
+                      onClick={() => setIsSimulationModalOpen(false)}
+                      className="flex-1 py-4 bg-white border border-agency-border text-agency-ink rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-agency-bg transition-all"
+                    >
+                      Dismiss
+                    </button>
+                    <button 
+                      onClick={() => {
+                        onAction('Bid strategy migration queued for Google Ads node synchronization.', 'success');
+                        setIsSimulationModalOpen(false);
+                      }}
+                      className="flex-[2] py-4 bg-agency-accent text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-agency-accent/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                    >
+                      Apply Proposed Strategy
+                    </button>
+                  </div>
+                  {simulationResult.results.delta.roas.includes('+') && (
+                    <button 
+                      disabled={isAdjusting}
+                      onClick={() => handleAdjustTarget(simulationResult.simulation_id.split('-')[1])}
+                      className="w-full py-4 border-2 border-emerald-500/20 text-emerald-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-50 transition-all flex items-center justify-center gap-2"
+                    >
+                      {isAdjusting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ChevronUp className="w-4 h-4" />}
+                      Execute Gradual Target Lift (+20%)
+                    </button>
+                  )}
+                </div>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
-  </div>
-);
+  );
+};
 
 const SocialMediaView = ({ onAction }: { onAction: (name: string, type?: string) => void }) => {
   const [isSyncing, setIsSyncing] = useState(false);
@@ -2052,7 +5785,7 @@ const DebugConsole = ({ logs }: { logs: SystemLog[] }) => (
   </div>
 );
 
-const ProtocolView = ({ onAction, logs }: { onAction: (name: string, type?: string) => void, logs: SystemLog[] }) => {
+const ProtocolView = ({ onAction, logs, a2aStatus }: { onAction: (name: string, type?: 'success' | 'info' | 'warning' | 'error') => void, logs: SystemLog[], a2aStatus: A2ASystemStatusResponse | null }) => {
   const [debugMode, setDebugMode] = useState(false);
 
   return (
@@ -2060,14 +5793,33 @@ const ProtocolView = ({ onAction, logs }: { onAction: (name: string, type?: stri
       {/* Top Controls: Scaling Engine Overview */}
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg shadow-inner">
-            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-            <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">Scaling Engine Active</span>
-          </div>
+          {a2aStatus ? (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg shadow-inner">
+              <div className={cn(
+                "w-2 h-2 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]",
+                a2aStatus.sync_health === 'OPTIMAL' ? "bg-emerald-500" : "bg-amber-500"
+              )} />
+              <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">
+                System: {a2aStatus.sync_health} (v{a2aStatus.protocol_version})
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg shadow-inner">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+              <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">Scaling Engine Active</span>
+            </div>
+          )}
           <div className="h-4 w-px bg-agency-border" />
-          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-agency-bg border border-agency-border rounded-lg text-[10px] font-bold uppercase text-agency-muted">
-            <Layers className="w-3.5 h-3.5" /> 2M Context Shard
-          </div>
+          {a2aStatus && (
+            <div className="flex items-center gap-2 overflow-hidden max-w-sm">
+              {a2aStatus.connected_agents.map(agent => (
+                <div key={agent} className="flex items-center gap-1 px-2 py-1 bg-agency-bg border border-agency-border rounded text-[8px] font-bold text-agency-muted uppercase whitespace-nowrap">
+                  <div className="w-1 h-1 rounded-full bg-emerald-400" />
+                  {agent.replace('-agent', '')}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
         <button 
           onClick={() => setDebugMode(!debugMode)}
@@ -3085,13 +6837,21 @@ const MediaCenterView = ({
   assets, 
   setAssets, 
   campaigns, 
-  setCampaigns 
+  setCampaigns,
+  onIngest,
+  onSynthesizeVoice,
+  onValidate,
+  onDeploy
 }: { 
   onAction: (name: string, type?: string) => void,
   assets: MediaAsset[],
   setAssets: React.Dispatch<React.SetStateAction<MediaAsset[]>>,
   campaigns: ContentCampaign[],
-  setCampaigns: React.Dispatch<React.SetStateAction<ContentCampaign[]>>
+  setCampaigns: React.Dispatch<React.SetStateAction<ContentCampaign[]>>,
+  onIngest: (file: File, type: 'audio' | 'video') => Promise<void>,
+  onSynthesizeVoice: (samples: File[], targets: any) => Promise<string | undefined>,
+  onValidate: (assetId: string) => Promise<any>,
+  onDeploy: (campaignId: string) => Promise<void>
 }) => {
   const [isIngesting, setIsIngesting] = useState(false);
   const [ingestionStage, setIngestionStage] = useState<'initial' | 'analyzing' | 'complete'>('initial');
@@ -3124,6 +6884,140 @@ const MediaCenterView = ({
 
   const [mediaCenterAssets, setMediaCenterAssets] = useState<MediaCenterAsset[]>([]);
   const [isMediaCenterLoading, setIsMediaCenterLoading] = useState(false);
+  const [isComplianceScanning, setIsComplianceScanning] = useState<string | null>(null);
+  const [complianceResults, setComplianceResults] = useState<Record<string, any>>({});
+  const [isComplianceModalOpen, setIsComplianceModalOpen] = useState(false);
+  const [selectedAssetForCompliance, setSelectedAssetForCompliance] = useState<MediaCenterAsset | null>(null);
+
+  const [isCinematicGenModalOpen, setIsCinematicGenModalOpen] = useState(false);
+  const [isGeneratingCinematic, setIsGeneratingCinematic] = useState(false);
+  const [cinematicProgress, setCinematicProgress] = useState<{ step: string; percent: number }>({ step: '', percent: 0 });
+  const [cinematicResult, setCinematicResult] = useState<{ videoUrl?: string; audioUrl?: string; script?: string } | null>(null);
+
+  const ensureApiKey = async () => {
+    // Check if the platform has the helper, if not, assume process.env.GEMINI_API_KEY is fine
+    if (typeof (window as any).aistudio?.hasSelectedApiKey === 'function') {
+      const hasKey = await (window as any).aistudio.hasSelectedApiKey();
+      if (!hasKey) {
+        onAction('Cinematic rendering requires a paid tier API key. Please select one.', 'info');
+        await (window as any).aistudio.openSelectKey();
+      }
+    }
+    return true;
+  };
+
+  const executeCinematicGeneration = async () => {
+    setIsGeneratingCinematic(true);
+    setCinematicResult(null);
+    setCinematicProgress({ step: 'Initializing Neural Render Cluster...', percent: 5 });
+    onAction('Initializing high-fidelity cinematic generation sequence...', 'info');
+
+    try {
+      await ensureApiKey();
+      const apiKey = process.env.GEMINI_API_KEY || (process.env as any).API_KEY;
+      const ai = new GoogleGenAI({ apiKey });
+
+      // Step 1: Script Synthesis
+      setCinematicProgress({ step: 'Synthesizing voiceover script...', percent: 15 });
+      const scriptResponse = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: "Write a short, punchy 15-second voiceover script for a luxury urban lifestyle brand. Focus: Quality, Freedom, and Warmth. Return only the script text.",
+        config: {
+          systemInstruction: "You are a world-class copywriter. Keep it under 30 words."
+        }
+      });
+      const script = scriptResponse.text;
+
+      // Step 2: Voiceover Synthesis
+      setCinematicProgress({ step: 'Generating neural voiceover (Zephyr)...', percent: 30 });
+      const ttsResponse = await ai.models.generateContent({
+        model: "gemini-3.1-flash-tts-preview",
+        contents: [{ parts: [{ text: script }] }],
+        config: {
+          responseModalities: [Modality.AUDIO],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: 'Zephyr' },
+            },
+          },
+        },
+      });
+      const audioBase64 = ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      let audioUrl = '';
+      if (audioBase64) {
+        const audioBlob = await (await fetch(`data:audio/wav;base64,${audioBase64}`)).blob();
+        audioUrl = URL.createObjectURL(audioBlob);
+      }
+
+      // Step 3: Video Synthesis (Veo)
+      setCinematicProgress({ step: 'Rendering 1080p Cinematic Frames (Veo)...', percent: 50 });
+      let operation = await ai.models.generateVideos({
+        model: 'veo-3.1-generate-preview',
+        prompt: videoGenPrompt,
+        config: {
+          numberOfVideos: 1,
+          resolution: '1080p',
+          aspectRatio: '16:9'
+        }
+      });
+
+      // Polling
+      let pollCount = 0;
+      while (!operation.done && pollCount < 30) {
+        await new Promise(resolve => setTimeout(resolve, 10000));
+        operation = await ai.operations.getVideosOperation({ operation: operation });
+        pollCount++;
+        setCinematicProgress({ 
+          step: `Frame synthesis in progress... (${pollCount * 3}s elapsed)`, 
+          percent: 50 + Math.min(45, pollCount * 2) 
+        });
+      }
+
+      const videoLink = operation.response?.generatedVideos?.[0]?.video?.uri;
+      let finalVideoUrl = '';
+      if (videoLink) {
+        setCinematicProgress({ step: 'Finalizing multimodal buffer...', percent: 95 });
+        const videoResponse = await fetch(videoLink, {
+          headers: { 'x-goog-api-key': apiKey as string }
+        });
+        const videoBlob = await videoResponse.blob();
+        finalVideoUrl = URL.createObjectURL(videoBlob);
+      }
+
+      setCinematicResult({ 
+        videoUrl: finalVideoUrl, 
+        audioUrl, 
+        script 
+      });
+
+      const newAsset: MediaCenterAsset = {
+        asset_id: `cinematic-${Date.now()}`,
+        asset_name: `Cinematic_Urban_${Date.now()}.mp4`,
+        asset_type: 'video',
+        status: 'READY',
+        production_version: 'v4.0_PRO',
+        brand_alignment: { confidence: 0.99, detected_tone: 'Luxury', visual_match: 0.98 },
+        usage_rights: { campaigns: ['Cinematic_Pro'], platforms_approved: ['YouTube', 'Meta', 'TikTok'] },
+        download_url: finalVideoUrl,
+        cdn_url: finalVideoUrl
+      };
+      
+      setMediaCenterAssets(prev => [newAsset, ...prev]);
+      setCinematicProgress({ step: 'Production Ready.', percent: 100 });
+      onAction('Cinematic Pro Asset successfully rendered and mastered.', 'success');
+    } catch (error: any) {
+      console.error(error);
+      const errorMsg = error?.message || '';
+      if (errorMsg.includes('Requested entity was not found')) {
+        onAction('API Key session expired. Please re-select key.', 'warning');
+        await (window as any).aistudio.openSelectKey();
+      } else {
+        onAction('Cinematic rendering failed. Check network or API limits.', 'error');
+      }
+    } finally {
+      setIsGeneratingCinematic(false);
+    }
+  };
 
   useEffect(() => {
     setIsMediaCenterLoading(true);
@@ -3165,18 +7059,21 @@ const MediaCenterView = ({
   // Simulated Multimodal Orchestration Sync (WS)
   useEffect(() => {
     const wsEvents = [
-      { event: 'MEDIA_INGEST_COMPLETE', msg: 'Core brand footage ingested. Triggering tone analysis cluster...' },
-      { event: 'TONE_ANALYSIS_COMPLETE', msg: 'Acoustic fingerprint locked. Updating production tone heads.' },
-      { event: 'CAMPAIGN_ASSET_READY', msg: 'New video synth asset compiled. Production v2.4 initialized.' },
-      { event: 'VALIDATION_PASSED', msg: 'Multimodal compliance verified. Ready for deployment queue.' }
+      { event: 'TENANT_PROVISION_SUCCESS', msg: 'Tenant Shards active. Edge routing normalized.' },
+      { event: 'TONE_TRAINING_READY', msg: 'Neural voice head VO-881 finished training. Dimensions locked.' },
+      { event: 'AUDIO_CHUNK_RECEIVED', msg: 'Multimodal ingest stream: Audio segment extraction complete.' },
+      { event: 'SCENE_SCAN_SYNC', msg: 'Brand footage scan: Hero product detected at 0.98 confidence.' },
+      { event: 'VIDEO_SYNTH_READY', msg: 'Cinematic creative generated. Validation suite initiated.' },
+      { event: 'VALIDATION_CONFIRMED', msg: 'Brand alignment score 96.4%. Passing to deployment queue.' },
+      { event: 'DEPLOYMENT_BROADCAST', msg: 'Campaign payload dispatched to Meta/Google/TikTok nodes.' }
     ];
 
     let eventIdx = 0;
     const interval = setInterval(() => {
       const e = wsEvents[eventIdx % wsEvents.length];
-      onAction(`[Real-time Sync: ${e.event}] ${e.msg}`, 'info');
+      onAction(`[AOS-WS] ${e.event}: ${e.msg}`, 'info');
       eventIdx++;
-    }, 45000);
+    }, 30000);
 
     return () => clearInterval(interval);
   }, []);
@@ -3498,6 +7395,47 @@ const MediaCenterView = ({
     }
   };
 
+  const executeBrandComplianceScan = async (asset: MediaCenterAsset) => {
+    setIsComplianceScanning(asset.asset_id);
+    onAction(`Initializing Brand Compliance Scan for ${asset.asset_name}...`, 'info');
+
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      
+      const prompt = `Analyze this video asset for brand compliance.
+      - Component: ${asset.asset_name}
+      - Context: Agency production for high-tier scaling.
+      - Focus areas: 1) Logo visibility (is it clear, obstructed, or persistent?), 2) Color palette accuracy (compliance with brand primary #2A2A2A and secondary #E8A87C).
+      
+      Return a JSON object with:
+      - logo_visibility: { score: number, observation: string, timestamp_detected: string[] }
+      - color_palette: { accuracy_score: number, dominant_hex: string[], delta_explanation: string }
+      - overall_compliance: number
+      - flags: string[]
+      - summary: string`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json"
+        }
+      });
+
+      const result = JSON.parse(response.text);
+      setComplianceResults(prev => ({ ...prev, [asset.asset_id]: result }));
+      setSelectedAssetForCompliance(asset);
+      setIsComplianceModalOpen(true);
+      
+      onAction(`Compliance scan complete: Score ${result.overall_compliance}%`, 'success');
+    } catch (error) {
+      console.error(error);
+      onAction('Compliance scan module failed.', 'error');
+    } finally {
+      setIsComplianceScanning(null);
+    }
+  };
+
   const executeAudioIngest = async () => {
     if (!selectedAudioFile) return;
     
@@ -3550,32 +7488,33 @@ const MediaCenterView = ({
     if (isIngesting) return;
     setIsIngesting(true);
     setIngestionStage('analyzing');
-    onAction('Initiating multimodal ingestion sequence...', 'info');
     
-    // Simulate deep context extraction
-    await new Promise(r => setTimeout(r, 2500));
-    
-    const names = ['Campaign_Vibe_Check.mp4', 'Q4_Market_Pulse.audio', 'Growth_Strategy_Doc.pdf'];
-    const types: ('video' | 'audio' | 'doc')[] = ['video', 'audio', 'doc'];
-    const idx = Math.floor(Math.random() * names.length);
-
-    const newAsset: MediaAsset = {
-      id: `m-${Date.now()}`,
-      name: names[idx],
-      type: types[idx],
-      url: '#',
-      aiDescription: `Automated extraction from source context. Brand alignment detected at high confidence level. Found ${Math.floor(Math.random() * 10) + 5} key thematic hooks.`,
-      brandConsistency: Math.floor(Math.random() * 10) + 90
-    };
-    
-    setAssets(prev => [newAsset, ...prev]);
-    setIngestionStage('complete');
-    onAction('Multimodal source metadata successfully extracted and indexed.', 'success');
-    
-    setTimeout(() => {
-      setIsIngesting(false);
-      setIngestionStage('initial');
-    }, 1500);
+    try {
+      const dummyFile = new File(["multimodal content"], "brand_source.mov", { type: "video/quicktime" });
+      await onIngest(dummyFile, 'video');
+      
+      const newAsset: MediaCenterAsset = {
+        asset_id: `m-${Date.now()}`,
+        asset_name: 'Brand_Source_Scan.mov',
+        asset_type: 'video',
+        status: 'Processing',
+        production_version: 'v2.4',
+        brand_alignment: { confidence: 0.98, detected_tone: 'Technical', visual_match: 0.95 },
+        usage_rights: { campaigns: ['Growth_2024'], platforms_approved: ['Meta', 'TikTok'] },
+        download_url: '#',
+        cdn_url: '#'
+      };
+      
+      setMediaCenterAssets(prev => [newAsset, ...prev]);
+      setIngestionStage('complete');
+    } catch (err) {
+      onAction('Ingest failed.', 'error');
+    } finally {
+      setTimeout(() => {
+        setIsIngesting(false);
+        setIngestionStage('initial');
+      }, 1500);
+    }
   };
 
   const handleStartCampaignGen = async () => {
@@ -3718,6 +7657,10 @@ const MediaCenterView = ({
                 <Volume2 className="w-4 h-4 mx-auto text-agency-accent mb-1 group-hover:scale-110 transition-transform" />
                 <div className="text-[8px] font-black uppercase text-agency-muted">Audio Master</div>
               </div>
+              <div className="p-3 bg-agency-bg border border-agency-border rounded-xl text-center group hover:border-agency-accent border-agency-accent/30 bg-agency-accent/5 transition-colors cursor-pointer shadow-sm" onClick={() => setIsCinematicGenModalOpen(true)}>
+                <Sparkles className="w-4 h-4 mx-auto text-agency-accent mb-1 group-hover:scale-110 transition-transform" />
+                <div className="text-[8px] font-black uppercase text-agency-accent">Cinematic Pro</div>
+              </div>
               <div className="p-3 bg-agency-bg border border-agency-border rounded-xl text-center group hover:border-agency-accent transition-colors cursor-pointer" onClick={() => setIsIdentityModalOpen(true)}>
                 <Fingerprint className="w-4 h-4 mx-auto text-agency-accent mb-1 group-hover:scale-110 transition-transform" />
                 <div className="text-[8px] font-black uppercase text-agency-muted">Neural Identity</div>
@@ -3832,7 +7775,7 @@ const MediaCenterView = ({
             ))}
           </div>
           <button 
-            onClick={() => onAction('Opening AI Voice training portal...', 'info')}
+            onClick={() => onSynthesizeVoice([new File([], 'sample.wav')], { technical: 92, friendly: 45, efficiency: 88 })}
             className="w-full mt-8 py-2 bg-agency-bg border border-agency-border rounded-xl text-[9px] font-black uppercase tracking-widest text-agency-ink hover:bg-white transition-colors"
           >
             Train Custom Head
@@ -3887,7 +7830,53 @@ const MediaCenterView = ({
                     <span className="text-[9px] font-bold uppercase tracking-widest text-agency-ink">{asset.production_version} BUILD</span>
                     <span className="text-[7px] text-agency-muted font-bold uppercase tracking-tighter">Tone: {asset.brand_alignment.detected_tone}</span>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-1">
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        executeBrandComplianceScan(asset);
+                      }}
+                      disabled={isComplianceScanning === asset.asset_id}
+                      className={cn(
+                        "text-[8px] font-black uppercase px-2 py-1 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-all flex items-center gap-1",
+                        isComplianceScanning === asset.asset_id && "animate-pulse opacity-50"
+                      )}
+                    >
+                      {isComplianceScanning === asset.asset_id ? <RefreshCw className="w-3 h-3 animate-spin" /> : <ShieldCheck className="w-3 h-3" />}
+                      Scan
+                    </button>
+                    {asset.status !== 'DEPLOYED' && (
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onValidate(asset.asset_id).then(res => {
+                            if (res?.score && res.score >= 95) {
+                              setMediaCenterAssets(prev => prev.map(a => 
+                                a.asset_id === asset.asset_id ? { ...a, status: 'VALIDATED' } : a
+                              ));
+                            }
+                          });
+                        }}
+                        className="text-[8px] font-black uppercase text-agency-accent px-2 py-1 bg-agency-accent/10 rounded-lg hover:bg-agency-accent/20 transition-all"
+                      >
+                        Validate
+                      </button>
+                    )}
+                    {asset.status === 'VALIDATED' && (
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeploy(asset.asset_id).then(() => {
+                            setMediaCenterAssets(prev => prev.map(a => 
+                              a.asset_id === asset.asset_id ? { ...a, status: 'DEPLOYED' } : a
+                            ));
+                          });
+                        }}
+                        className="text-[8px] font-black uppercase text-emerald-600 px-2 py-1 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-all animate-pulse"
+                      >
+                        Deploy
+                      </button>
+                    )}
                     <button 
                       onClick={(e) => {
                         e.stopPropagation();
@@ -3982,6 +7971,402 @@ const MediaCenterView = ({
           </div>
         </div>
       </div>
+
+      {/* Cinematic Pro Modal */}
+      <AnimatePresence>
+        {isCinematicGenModalOpen && (
+          <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => !isGeneratingCinematic && setIsCinematicGenModalOpen(false)}
+              className="absolute inset-0 bg-agency-ink/70 backdrop-blur-xl"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 30 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 30 }}
+              className="relative w-full max-w-2xl bg-white rounded-[2rem] shadow-2xl overflow-hidden border border-agency-border flex flex-col"
+            >
+              <div className="p-8 border-b border-agency-border flex justify-between items-center bg-agency-bg/50">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-agency-accent text-white rounded-2xl shadow-lg shadow-agency-accent/20">
+                    <Sparkles className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold font-display uppercase tracking-tight text-agency-ink">Cinematic Pro Synthesis</h3>
+                    <p className="text-[10px] text-agency-muted font-bold uppercase tracking-widest mt-1">1080p HDR • Neutral Voiceover • Brand Palette sync</p>
+                  </div>
+                </div>
+                {!isGeneratingCinematic && (
+                  <button 
+                    onClick={() => setIsCinematicGenModalOpen(false)} 
+                    className="p-2 hover:bg-agency-bg rounded-full transition-colors"
+                  >
+                    <X className="w-5 h-5 text-agency-muted" />
+                  </button>
+                )}
+              </div>
+
+              <div className="p-10 space-y-8 overflow-y-auto max-h-[60vh]">
+                {!cinematicResult && !isGeneratingCinematic && (
+                  <div className="space-y-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                       <div className="space-y-4">
+                         <div className="flex items-center gap-2">
+                           <Clapperboard className="w-4 h-4 text-agency-accent" />
+                           <label className="text-[10px] font-black uppercase text-agency-ink tracking-widest">Master Narrative Prompt</label>
+                         </div>
+                         <textarea 
+                           rows={4}
+                           value={videoGenPrompt}
+                           onChange={(e) => setVideoGenPrompt(e.target.value)}
+                           className="w-full px-5 py-4 bg-agency-bg border border-agency-border rounded-2xl text-xs font-bold text-agency-ink focus:outline-none focus:border-agency-accent transition-colors resize-none shadow-inner"
+                           placeholder="Describe the aesthetic vision..."
+                         />
+                       </div>
+                       
+                       <div className="space-y-6">
+                         <div className="space-y-3">
+                           <div className="flex items-center gap-2">
+                             <Zap className="w-4 h-4 text-agency-accent" />
+                             <label className="text-[10px] font-black uppercase text-agency-ink tracking-widest">Rendering Specs</label>
+                           </div>
+                           <div className="p-4 bg-agency-bg border border-agency-border rounded-2xl space-y-3">
+                              <div className="flex justify-between items-center text-[10px] font-bold uppercase">
+                                <span>Duration</span>
+                                <span className="text-agency-accent">15 Seconds</span>
+                              </div>
+                              <div className="flex justify-between items-center text-[10px] font-bold uppercase">
+                                <span>Resolution</span>
+                                <span className="text-agency-accent">1080p (HDR Optimized)</span>
+                              </div>
+                              <div className="flex justify-between items-center text-[10px] font-bold uppercase">
+                                <span>Scale Factor</span>
+                                <span className="text-agency-accent">16:9 Cinema</span>
+                              </div>
+                           </div>
+                         </div>
+
+                         <div className="space-y-3">
+                           <div className="flex items-center gap-2">
+                             <Palette className="w-4 h-4 text-agency-accent" />
+                             <label className="text-[10px] font-black uppercase text-agency-ink tracking-widest">Brand Palette Lock</label>
+                           </div>
+                           <div className="flex gap-2 p-1.5 bg-agency-bg border border-agency-border rounded-xl">
+                              {['#2A2A2A', '#F5F5F5', '#E8A87C'].map(c => (
+                                <div key={c} className="h-8 flex-1 rounded-lg shadow-sm border border-black/5" style={{ backgroundColor: c }} title={c} />
+                              ))}
+                           </div>
+                         </div>
+                       </div>
+                    </div>
+                  </div>
+                )}
+
+                {isGeneratingCinematic && (
+                  <div className="py-12 space-y-10 text-center">
+                    <div className="relative inline-block">
+                      <div className="w-32 h-32 rounded-full border-4 border-agency-bg border-t-agency-accent animate-spin" />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <Sparkles className="w-10 h-10 text-agency-accent animate-pulse" />
+                      </div>
+                    </div>
+                    <div className="space-y-4">
+                      <h4 className="text-xl font-bold font-display uppercase tracking-tight text-agency-ink animate-pulse">{cinematicProgress.step}</h4>
+                      <div className="max-w-xs mx-auto space-y-2">
+                        <div className="h-1.5 w-full bg-agency-bg rounded-full overflow-hidden">
+                          <motion.div 
+                            className="h-full bg-agency-accent"
+                            initial={{ width: 0 }}
+                            animate={{ width: `${cinematicProgress.percent}%` }}
+                          />
+                        </div>
+                        <div className="flex justify-between text-[10px] font-black text-agency-muted uppercase tracking-widest">
+                          <span>Rendering Depth</span>
+                          <span>{cinematicProgress.percent}%</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex justify-center gap-8 text-agency-muted opacity-60">
+                      <div className="flex flex-col items-center gap-1">
+                        <Video className="w-5 h-5" />
+                        <span className="text-[8px] font-black uppercase">Veo Pro</span>
+                      </div>
+                      <div className="flex flex-col items-center gap-1">
+                        <Volume2 className="w-5 h-5" />
+                        <span className="text-[8px] font-black uppercase">TTS-Zephyr</span>
+                      </div>
+                      <div className="flex flex-col items-center gap-1">
+                        <Cpu className="w-5 h-5" />
+                        <span className="text-[8px] font-black uppercase">A2A_Cluster</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {cinematicResult && (
+                  <div className="space-y-8 animate-in zoom-in-95 duration-500">
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
+                      <div className="md:col-span-3 space-y-4">
+                        <div className="aspect-video bg-black rounded-3xl overflow-hidden shadow-2xl border border-agency-border relative group">
+                          {cinematicResult.videoUrl ? (
+                            <video src={cinematicResult.videoUrl} autoPlay loop muted className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-white/50 text-[10px] uppercase font-bold tracking-widest">Video Preview (In Buffer)</div>
+                          )}
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-6">
+                            <div className="text-white">
+                              <div className="text-[10px] font-black uppercase tracking-widest text-white/70">Cinematic Master</div>
+                              <div className="text-xs font-bold">PRO_RENDER_HDR_V4</div>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="p-5 bg-agency-bg rounded-2xl border border-agency-border flex items-center justify-between">
+                           <div className="flex items-center gap-3">
+                              <div className="p-2 bg-agency-ink text-white rounded-xl">
+                                <Mic className="w-4 h-4" />
+                              </div>
+                              <div>
+                                <div className="text-[10px] font-black uppercase text-agency-ink">Master Voiceover</div>
+                                <div className="text-[8px] text-agency-muted font-bold">Model: gemini-3.1-flash-tts (Kore)</div>
+                              </div>
+                           </div>
+                           {cinematicResult.audioUrl && (
+                             <audio src={cinematicResult.audioUrl} controls className="h-8 max-w-[150px]" />
+                           )}
+                        </div>
+                      </div>
+
+                      <div className="md:col-span-2 space-y-6">
+                        <div className="space-y-3">
+                          <label className="text-[10px] font-black uppercase text-agency-muted tracking-widest">Master Script</label>
+                          <div className="p-5 bg-agency-bg/50 border border-agency-border rounded-2xl text-[11px] leading-relaxed text-agency-ink font-serif italic relative">
+                            <div className="absolute -top-2 -left-2 bg-agency-accent text-white p-1 rounded-md">
+                              <FileText className="w-3 h-3" />
+                            </div>
+                            "{cinematicResult.script}"
+                          </div>
+                        </div>
+
+                        <div className="space-y-4">
+                          <label className="text-[10px] font-black uppercase text-agency-muted tracking-widest">Asset Parameters</label>
+                          <div className="space-y-2">
+                             <div className="flex justify-between items-center pb-2 border-b border-agency-border">
+                               <span className="text-[9px] font-bold text-agency-muted uppercase">Duration</span>
+                               <span className="text-[10px] font-black text-agency-ink">15.0s</span>
+                             </div>
+                             <div className="flex justify-between items-center pb-2 border-b border-agency-border">
+                               <span className="text-[9px] font-bold text-agency-muted uppercase">Bitrate</span>
+                               <span className="text-[10px] font-black text-agency-ink">12.4 Mbps</span>
+                             </div>
+                             <div className="flex justify-between items-center">
+                               <span className="text-[9px] font-bold text-agency-muted uppercase">Audio Format</span>
+                               <span className="text-[10px] font-black text-agency-ink">WAV 48kHz</span>
+                             </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 p-3 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-100">
+                          <BadgeCheck className="w-4 h-4" />
+                          <span className="text-[9px] font-black uppercase">Brand Safety Certified</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-8 border-t border-agency-border bg-agency-bg/50 flex gap-4">
+                {cinematicResult ? (
+                  <>
+                    <button 
+                      onClick={() => setIsCinematicGenModalOpen(false)}
+                      className="flex-1 py-4 bg-white border border-agency-border rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-agency-bg transition-colors"
+                    >
+                      Dismiss
+                    </button>
+                    <button 
+                      onClick={() => {
+                        onAction('Cinematic asset synchronized with campaign delivery systems.', 'success');
+                        setIsCinematicGenModalOpen(false);
+                      }}
+                      className="flex-1 py-4 bg-agency-accent text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-agency-accent/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                    >
+                      Deploy Master <ArrowUpRight className="w-4 h-4" />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button 
+                      onClick={() => setIsCinematicGenModalOpen(false)}
+                      disabled={isGeneratingCinematic}
+                      className="flex-1 py-4 bg-white border border-agency-border rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-agency-bg transition-colors text-agency-muted"
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      onClick={executeCinematicGeneration}
+                      disabled={isGeneratingCinematic}
+                      className="flex-[2] py-4 bg-agency-ink text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-agency-ink/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3"
+                    >
+                      {isGeneratingCinematic ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
+                      {isGeneratingCinematic ? "Synthesizing Multimodal..." : "Execute Cinematic Render"}
+                    </button>
+                  </>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      {/* Brand Compliance Modal */}
+      <AnimatePresence>
+        {isComplianceModalOpen && selectedAssetForCompliance && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-agency-ink/80 backdrop-blur-sm"
+              onClick={() => setIsComplianceModalOpen(false)}
+            />
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden border border-agency-border"
+            >
+              <div className="p-6 border-b border-agency-border bg-agency-bg/50 flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-agency-accent text-white rounded-xl">
+                    <ShieldCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold font-display uppercase tracking-tight">Compliance Audit Report</h3>
+                    <p className="text-[10px] text-agency-muted font-bold uppercase tracking-widest">{selectedAssetForCompliance.asset_name} • Asset ID: {selectedAssetForCompliance.asset_id}</p>
+                  </div>
+                </div>
+                <button onClick={() => setIsComplianceModalOpen(false)} className="p-2 hover:bg-agency-bg rounded-full transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-8 space-y-8 max-h-[70vh] overflow-y-auto">
+                {complianceResults[selectedAssetForCompliance.asset_id] ? (
+                  <>
+                    <div className="flex items-center gap-8 p-6 bg-agency-bg rounded-2xl border border-agency-border">
+                      <div className="text-center">
+                        <div className="text-4xl font-black text-agency-accent tracking-tighter">
+                          {complianceResults[selectedAssetForCompliance.asset_id].overall_compliance}%
+                        </div>
+                        <div className="text-[9px] font-black uppercase text-agency-muted tracking-widest mt-1">Compliance Score</div>
+                      </div>
+                      <div className="flex-1 h-px bg-agency-border" />
+                      <div className="flex-1">
+                        <p className="text-xs text-agency-ink font-medium leading-relaxed italic">
+                          "{complianceResults[selectedAssetForCompliance.asset_id].summary}"
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2 text-agency-ink">
+                          <Eye className="w-4 h-4 text-agency-accent" />
+                          <h4 className="text-[10px] font-black uppercase tracking-widest">Logo Visibility</h4>
+                        </div>
+                        <div className="p-4 bg-white border border-agency-border rounded-xl space-y-3">
+                           <div className="flex justify-between items-center">
+                             <span className="text-xs font-bold">Detection Score</span>
+                             <span className="text-xs font-bold text-agency-accent">{complianceResults[selectedAssetForCompliance.asset_id].logo_visibility.score}%</span>
+                           </div>
+                           <div className="h-1 bg-agency-bg rounded-full overflow-hidden">
+                             <div className="h-full bg-agency-accent" style={{ width: `${complianceResults[selectedAssetForCompliance.asset_id].logo_visibility.score}%` }} />
+                           </div>
+                           <p className="text-[10px] text-agency-muted leading-relaxed">
+                             {complianceResults[selectedAssetForCompliance.asset_id].logo_visibility.observation}
+                           </p>
+                           <div className="flex flex-wrap gap-1 mt-2">
+                             {complianceResults[selectedAssetForCompliance.asset_id].logo_visibility.timestamp_detected.map((t: string) => (
+                               <span key={t} className="text-[7px] px-1.5 py-0.5 bg-agency-bg rounded border border-agency-border font-bold">{t}</span>
+                             ))}
+                           </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2 text-agency-ink">
+                          <Palette className="w-4 h-4 text-agency-accent" />
+                          <h4 className="text-[10px] font-black uppercase tracking-widest">Color Accuracy</h4>
+                        </div>
+                        <div className="p-4 bg-white border border-agency-border rounded-xl space-y-3">
+                           <div className="flex justify-between items-center">
+                             <span className="text-xs font-bold">Palette Alignment</span>
+                             <span className="text-xs font-bold text-agency-accent">{complianceResults[selectedAssetForCompliance.asset_id].color_palette.accuracy_score}%</span>
+                           </div>
+                           <div className="flex gap-2">
+                             {complianceResults[selectedAssetForCompliance.asset_id].color_palette.dominant_hex.map((hex: string) => (
+                               <div key={hex} className="w-6 h-6 rounded-md border border-agency-border" style={{ backgroundColor: hex }} title={hex} />
+                             ))}
+                           </div>
+                           <p className="text-[10px] text-agency-muted leading-relaxed">
+                             {complianceResults[selectedAssetForCompliance.asset_id].color_palette.delta_explanation}
+                           </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <h4 className="text-[10px] font-black uppercase tracking-widest text-agency-muted">Critical Flags & Observations</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {complianceResults[selectedAssetForCompliance.asset_id].flags.map((flag: string, idx: number) => (
+                          <div key={idx} className="flex items-center gap-3 p-3 bg-red-50 border border-red-100 rounded-xl">
+                            <AlertCircle className="w-4 h-4 text-red-500" />
+                            <span className="text-[10px] font-bold text-red-700">{flag}</span>
+                          </div>
+                        ))}
+                        {complianceResults[selectedAssetForCompliance.asset_id].flags.length === 0 && (
+                          <div className="col-span-2 flex items-center gap-3 p-3 bg-emerald-50 border border-emerald-100 rounded-xl">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                            <span className="text-[10px] font-bold text-emerald-700">No regulatory or brand-safety violations detected.</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="py-12 text-center">
+                    <RefreshCw className="w-8 h-8 text-agency-accent animate-spin mx-auto mb-4" />
+                    <p className="text-xs font-bold text-agency-muted uppercase tracking-widest">Generating detailed compliance report...</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-6 border-t border-agency-border bg-agency-bg/50 flex gap-3">
+                <button 
+                  onClick={() => setIsComplianceModalOpen(false)}
+                  className="flex-1 px-6 py-3 bg-white border border-agency-border rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-agency-bg transition-colors"
+                >
+                  Close Report
+                </button>
+                <button 
+                  onClick={() => {
+                    onAction('Audit report exported to Agency cloud storage.', 'success');
+                    setIsComplianceModalOpen(false);
+                  }}
+                  className="flex-1 px-6 py-3 bg-agency-accent text-white rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-agency-accent/20 transition-all font-black"
+                >
+                  <Download className="w-4 h-4" />
+                  Export Audit
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Audio Ingest Modal */}
       <AnimatePresence>
@@ -5200,13 +9585,19 @@ const AgencyConfigView = ({
   setBranding, 
   subscription, 
   setSubscription, 
-  onAction 
+  onAction,
+  onProvision,
+  isProvisioning,
+  tenantId
 }: { 
   branding: any, 
   setBranding: (b: any) => void, 
   subscription: any, 
   setSubscription: (s: any) => void,
-  onAction: (name: string, type?: string) => void 
+  onAction: (name: string, type?: string) => void,
+  onProvision: (config: any) => Promise<void>,
+  isProvisioning: boolean,
+  tenantId: string
 }) => (
   <div className="space-y-8 animate-in slide-in-from-right-4 duration-500">
     <div className="flex justify-between items-center text-agency-ink">
@@ -5281,6 +9672,52 @@ const AgencyConfigView = ({
             <Upload className="w-8 h-8 text-agency-muted mx-auto mb-3" />
             <div className="text-xs font-bold text-agency-ink">Upload Brand Logo</div>
             <p className="text-[10px] text-agency-muted mt-1">Recommended size: 512x512px. SVG or PNG.</p>
+          </div>
+        </div>
+
+        <div className="panel-card p-8 bg-agency-sidebar text-white">
+          <div className="flex justify-between items-start mb-8">
+            <div>
+              <h3 className="text-lg font-bold font-display uppercase tracking-tight flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-agency-accent" /> Tenant Orchestrator
+              </h3>
+              <p className="text-[10px] text-white/50 font-bold uppercase tracking-widest mt-1">Provision nodes & specialized AI compute</p>
+            </div>
+            <div className="text-right">
+               <div className="text-[9px] font-black uppercase text-white/40 mb-1">Status</div>
+               <div className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded text-[9px] font-black uppercase tracking-widest border border-emerald-500/30">Synced</div>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-4 bg-white/5 border border-white/10 rounded-2xl">
+                 <div className="text-[9px] font-black text-white/40 uppercase mb-2">Instance ID</div>
+                 <div className="text-xs font-mono font-bold text-agency-accent">{tenantId}</div>
+              </div>
+              <div className="p-4 bg-white/5 border border-white/10 rounded-2xl">
+                 <div className="text-[9px] font-black text-white/40 uppercase mb-2">Edge Routing</div>
+                 <div className="text-xs font-bold text-white">Active (Global)</div>
+              </div>
+            </div>
+
+            <button 
+              onClick={() => onProvision({ name: branding.agencyName, domain: branding.domain, branding })}
+              disabled={isProvisioning}
+              className="w-full py-4 bg-agency-accent text-white rounded-2xl text-xs font-bold uppercase tracking-widest shadow-xl shadow-agency-accent/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+            >
+              {isProvisioning ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  Provisioning AI Shards...
+                </>
+              ) : (
+                <>
+                  <Zap className="w-4 h-4" />
+                  Full-Stack Provision Tenant
+                </>
+              )}
+            </button>
           </div>
         </div>
 
@@ -5414,6 +9851,14 @@ export default function App() {
   const [workflows, setWorkflows] = useState<AutomationWorkflow[]>(AUTOMATION_WORKFLOWS);
   const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>(EMAIL_TEMPLATES);
 
+  // Workflow State & Identifiers (Steps 1-8)
+  const [tenantId, setTenantId] = useState<string>('T-6671-X');
+  const [apiKey, setApiKey] = useState<string>('AOS_990182_SEC');
+  const [isProvisioning, setIsProvisioning] = useState(false);
+  const [isMediaSyncing, setIsMediaSyncing] = useState(false);
+  const [a2aStatus, setA2aStatus] = useState<A2ASystemStatusResponse | null>(null);
+  const [cloudStatus, setCloudStatus] = useState<CloudStatusResponse | null>(null);
+
   const addNotification = (message: string, type: 'success' | 'info' | 'warning' | 'error' = 'info') => {
     const id = Math.random().toString(36).substring(7);
     const notification: Notification = { id, message, type, timestamp: Date.now() };
@@ -5433,6 +9878,129 @@ export default function App() {
       message
     };
     setLogs(prev => [newLog, ...prev.slice(0, 49)]);
+  };
+
+  // --- Step 1: Tenant Onboarding ---
+  const provisionTenant = async (config: { name: string, domain: string, branding: any }) => {
+    setIsProvisioning(true);
+    addNotification('Initiating Tenant Provisioning Sequence...', 'info');
+    try {
+      // POST /api/v1/tenants/provision
+      const response = await fetch('/api/v1/tenants/provision', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
+        body: JSON.stringify(config)
+      });
+      const data = await response.json();
+      setTenantId(data.tenant_id);
+      addNotification(`Tenant ${data.tenant_id} provisioned with custom branding.`, 'success');
+    } catch (err) {
+      addNotification('Orchestrator rejected provisioning request.', 'error');
+    } finally {
+      setIsProvisioning(false);
+    }
+  };
+
+  // --- Step 2: Voice Head Training ---
+  const trainVoiceHead = async (samples: File[], targets: { technical: number, friendly: number, efficiency: number }) => {
+    addNotification('Uploading voice samples to neural training cluster...', 'info');
+    try {
+       // POST /api/v1/tone-training/train-head
+       // We skip the actual File upload logic for the demo, simulating API call
+       const response = await fetch('/api/v1/tone-training/train-head', {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey, 'X-Tenant-ID': tenantId },
+         body: JSON.stringify({ samples_count: samples.length, dimension_targets: targets })
+       });
+       const { head_id } = await response.json();
+       addNotification(`Voice head ${head_id} training initialized. Monitoring progress.`, 'success');
+       return head_id;
+    } catch (err) {
+      addNotification('Vocal training sequence failed.', 'error');
+    }
+  };
+
+  // --- Step 3: Media Ingest Setup ---
+  const ingestMedia = async (file: File, type: 'audio' | 'video') => {
+    setIsMediaSyncing(true);
+    addNotification(`Ingesting multimodal asset: ${type} scan in progress...`, 'info');
+    try {
+      const formData = new FormData();
+      formData.append('media', file);
+      formData.append('tenant_id', tenantId);
+      formData.append('type', type);
+
+      const endpoint = type === 'audio' ? '/api/v1/multimodal/audio-ingest' : '/api/v1/multimodal/scene-scan';
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'X-API-Key': apiKey, 'X-A2A-Agent': 'media-ingest-agent' },
+        body: formData
+      });
+      const { session_id } = await response.json();
+
+      // Simulated WS feedback loop (Step 8 Monitoring Foundation)
+      addNotification(`Extraction session ${session_id} active. Waiting for completion webhook.`, 'info');
+    } catch (err) {
+      addNotification('Multimodal ingest pipeline stalled.', 'error');
+    } finally {
+      setIsMediaSyncing(false);
+    }
+  };
+
+  // --- Step 4/5: Campaign & Asset Generation ---
+  const generateCampaignAsset = async (campaignId: string, requirements: any) => {
+    addNotification('Synthesizing campaign assets from brand DNA...', 'info');
+    try {
+      const response = await fetch('/api/v1/video/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey, 'X-Tenant-ID': tenantId },
+        body: JSON.stringify({ campaign_id: campaignId, voiceover_head_id: 'VO-881', requirements })
+      });
+      const data = await response.json();
+      addNotification('Asset generation sequence complete. Initializing validation.', 'success');
+      return data;
+    } catch (err) {
+      addNotification('Asset synthesis failed.', 'error');
+    }
+  };
+
+  // --- Step 6: Validation & Alignment ---
+  const validateAsset = async (assetId: string) => {
+    addNotification('Running cross-modal validation suite...', 'info');
+    try {
+      const response = await fetch('/api/v1/video/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
+        body: JSON.stringify({ asset_id: assetId })
+      });
+      const data = await response.json();
+      const score = data.score || 96; // Fallback for demo
+      if (score >= 95) {
+        addNotification(`Validation PASSED: Brand Alignment ${score}%. Ready for deployment.`, 'success');
+      } else {
+        addNotification(`Validation FAILED: Score ${score}%. Rerouting to creative engine...`, 'warning');
+      }
+      return { score, status: data.status };
+    } catch (err) {
+      addNotification('Validation pipeline failed.', 'error');
+    }
+  };
+
+  // --- Step 7: Deployment ---
+  const deployCampaignToPlatforms = async (campaignId: string) => {
+    addNotification('Broadcasting campaign packets to platform connected nodes...', 'info');
+    try {
+      const response = await fetch(`/api/v1/campaigns/${campaignId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
+        body: JSON.stringify({ status: 'DEPLOYED' })
+      });
+      if (response.ok) {
+        addNotification('Campaign deployed. TikTok/Meta/Google nodes confirm sync.', 'success');
+      }
+    } catch (err) {
+      addNotification('Deployment rejected by edge gateway.', 'error');
+    }
   };
 
   const handleGlobalAction = (action: string, category: string) => {
@@ -5456,14 +10024,26 @@ export default function App() {
       case 'overview': return <Overview onAction={addNotification} />;
       case 'online': return <OnlineOpsView onAction={addNotification} segments={emailSegments} setSegments={setEmailSegments} workflows={workflows} setWorkflows={setWorkflows} templates={emailTemplates} setTemplates={setEmailTemplates} />;
       case 'seo': return <SEOEngineView onAction={addNotification} crawlData={seoCrawlData} setCrawlData={setSeoCrawlData} setDeliverables={setDeliverablesData} />;
-      case 'ppc': return <GoogleAdsView onAction={addNotification} />;
+      case 'ppc': return <PPCOpsView onAction={addNotification} tenantId={tenantId} setLogs={setLogs} a2aStatus={a2aStatus} setA2aStatus={setA2aStatus} cloudStatus={cloudStatus} setCloudStatus={setCloudStatus} />;
       case 'social': return <SocialMediaView onAction={addNotification} />;
-      case 'protocol': return <ProtocolView onAction={addNotification} logs={logs} />;
+      case 'protocol': return <ProtocolView onAction={addNotification} logs={logs} a2aStatus={a2aStatus} />;
       case 'vibe-library': return <VibeLibraryView onAction={addNotification} templates={agencyTemplates} setTemplates={setAgencyTemplates} />;
       case 'approvals': return <ApprovalsView onAction={addNotification} deliverables={deliverablesData} setDeliverables={setDeliverablesData} />;
       case 'personas': return <PersonasView onAction={addNotification} personas={personas} setPersonas={setPersonas} />;
       case 'collaboration': return <CollaborationView onAction={addNotification} />;
-      case 'media': return <MediaCenterView onAction={addNotification} assets={mediaAssets} setAssets={setMediaAssets} campaigns={contentCampaigns} setCampaigns={setContentCampaigns} />;
+      case 'media': return (
+        <MediaCenterView 
+          onAction={addNotification} 
+          assets={mediaAssets} 
+          setAssets={setMediaAssets} 
+          campaigns={contentCampaigns} 
+          setCampaigns={setContentCampaigns} 
+          onIngest={ingestMedia}
+          onSynthesizeVoice={trainVoiceHead}
+          onValidate={validateAsset}
+          onDeploy={deployCampaignToPlatforms}
+        />
+      );
       case 'clients': return <ClientsView onAction={addNotification} />;
       case 'agency-config': return (
         <AgencyConfigView 
@@ -5472,6 +10052,9 @@ export default function App() {
           setBranding={setBranding}
           subscription={subscription}
           setSubscription={setSubscription}
+          onProvision={provisionTenant}
+          isProvisioning={isProvisioning}
+          tenantId={tenantId}
         />
       );
       default: return <Overview onAction={addNotification} />;

@@ -468,6 +468,467 @@ async function startServer() {
     res.status(204).send();
   });
 
+  // --- ONLINE OPERATIONS ENDPOINTS ---
+
+  // OAuth Status
+  app.get('/api/v1/auth/oauth-status', (req, res) => {
+    res.json({
+      authenticated: true,
+      provider: 'Klaviyo',
+      expires_at: new Date(Date.now() + 3600000).toISOString(),
+      scopes: ['lists:read', 'segments:read', 'campaigns:write'],
+      tenant_id: 'tenant-a2a-marketing'
+    });
+  });
+
+  // Audience Segments
+  app.get('/api/v1/online-ops/audience/segments', (req, res) => {
+    res.json({
+      segments: [
+        {
+          segment_id: 'seg-high-value-saas',
+          name: 'High-Value SaaS Leads',
+          identifier: 'HV',
+          subscriber_count: 12400,
+          health_score: 98,
+          health_status: 'EXCELLENT',
+          open_rate: 34.2,
+          bounce_rate: 0.8,
+          spam_rate: 0.02,
+          sync_status: 'SYNCED',
+          last_sync: new Date().toISOString(),
+          source: 'CRM_DIRECT',
+          criteria: { MRR: '>500' },
+          deliverability: {
+            inbox_placement: 99.2,
+            domain_reputation: 'EXCELLENT',
+            ip_warming_status: 'COMPLETE',
+            provider_breakdown: { gmail: 45, outlook: 30, yahoo: 10, corporate: 15 }
+          }
+        },
+        {
+          segment_id: 'seg-abandoned-cart',
+          name: 'Abandoned Cart (Premium)',
+          identifier: 'AC',
+          subscriber_count: 4560,
+          health_score: 85,
+          health_status: 'GOOD',
+          open_rate: 42.1,
+          bounce_rate: 1.2,
+          spam_rate: 0.05,
+          sync_status: 'SYNCED',
+          last_sync: new Date().toISOString(),
+          source: 'KLAVIYO_SYNC',
+          criteria: { cart_value: '>200' },
+          deliverability: {
+            inbox_placement: 96.5,
+            domain_reputation: 'GOOD',
+            ip_warming_status: 'COMPLETE',
+            provider_breakdown: { gmail: 50, outlook: 25, yahoo: 15, corporate: 10 }
+          }
+        },
+        {
+          segment_id: 'seg-cold-leads-reengagement',
+          name: 'Cold Leads (Re-engagement)',
+          identifier: 'CL',
+          subscriber_count: 28000,
+          health_score: 42,
+          health_status: 'CRITICAL',
+          open_rate: 5.2,
+          bounce_rate: 5.2,
+          spam_rate: 0.8,
+          sync_status: 'SYNCED',
+          last_sync: new Date().toISOString(),
+          source: 'LEGACY_UPLOAD',
+          criteria: { last_active: '>180d' },
+          deliverability: {
+            inbox_placement: 68.0,
+            domain_reputation: 'POOR',
+            ip_warming_status: 'PENDING',
+            provider_breakdown: { gmail: 40, outlook: 20, yahoo: 30, corporate: 10 }
+          }
+        }
+      ],
+      total_subscribers: 44960,
+      aggregate_health: 75,
+      last_updated: new Date().toISOString()
+    });
+  });
+
+  // Reputation Monitoring
+  app.get('/api/v1/online-ops/reputation/monitor', (req, res) => {
+    res.json({
+      domain_status: 'EXCELLENT',
+      domain_reputation_score: 95,
+      ip_warming_status: {
+        current_phase: 'Phase 4: High Volume',
+        days_in_phase: 12,
+        daily_send_limit: 100000,
+        recommended_daily_volume: 85000,
+        warming_progress: 100
+      },
+      provider_side_throttling: {
+        gmail: { status: 'OPTIMAL', inbox_rate: 99.8, throttle_detected: false },
+        outlook: { status: 'OPTIMAL', inbox_rate: 98.5, throttle_detected: false },
+        yahoo: { status: 'MINIMAL_THROTTLE', inbox_rate: 94.2, throttle_detected: true, note: 'Rate limit hit on 10:00 UTC burst' }
+      },
+      ip_warming_latency_grid: {
+        grid_size: '30x30',
+        cells: [],
+        trend: 'IMPROVING'
+      },
+      alert_history: [
+        { timestamp: new Date().toISOString(), severity: 'INFO', message: 'Domain warmup sequence finalized.', action_taken: 'None', resolution_time_minutes: 0 }
+      ],
+      recommendations: ['Maintain current sending cadence', 'Monitor Yahoo feedback loops']
+    });
+  });
+
+  // Active Flows
+  app.get('/api/v1/online-ops/flows/active', (req, res) => {
+    res.json({
+      flows: [
+        {
+          flow_id: 'flow-ai-nurture',
+          name: 'AI Smart Nurture',
+          trigger_type: 'DYNAMIC_BEHAVIOR',
+          status: 'RUNNING',
+          steps: 12,
+          conversion_rate: 0,
+          conversion_status: 'WARMING_UP',
+          enrolled_contacts: 1250,
+          completed_contacts: 0,
+          active_contacts: 1250,
+          last_triggered: new Date().toISOString(),
+          performance: { click_rate: 2.1, unsubscribe_rate: 0.1 },
+          ai_optimization: { enabled: true, last_optimized: new Date().toISOString(), optimization_type: 'AB_TESTING', projected_improvement: '15%' }
+        },
+        {
+          flow_id: 'flow-saas-trial',
+          name: 'SaaS Trial Onboarding',
+          trigger_type: 'WEB_HOOK_SIGNUP',
+          status: 'RUNNING',
+          steps: 8,
+          conversion_rate: 14.5,
+          conversion_status: 'PERFORMING',
+          enrolled_contacts: 5400,
+          completed_contacts: 1200,
+          active_contacts: 4200,
+          last_triggered: new Date().toISOString(),
+          performance: { click_rate: 8.5, unsubscribe_rate: 0.5, trial_to_paid_conversion: 18.2 },
+          ai_optimization: { enabled: true, last_optimized: new Date().toISOString(), optimization_type: 'TIMING', projected_improvement: '5%' }
+        },
+        {
+          flow_id: 'flow-cart-abandon',
+          name: 'Cart Abandon Mastery',
+          trigger_type: 'EVENT_ABANDONED_CHECKOUT',
+          status: 'RUNNING',
+          steps: 3,
+          conversion_rate: 22.0,
+          conversion_status: 'EXCEPTIONAL',
+          enrolled_contacts: 8900,
+          completed_contacts: 7500,
+          active_contacts: 1400,
+          last_triggered: new Date().toISOString(),
+          performance: { click_rate: 12.4, unsubscribe_rate: 0.2, cart_recovery_rate: 24.5 },
+          ai_optimization: { enabled: true, last_optimized: new Date().toISOString(), optimization_type: 'SUBJECT_LINE', projected_improvement: '12%' }
+        }
+      ],
+      total_active_flows: 8,
+      aggregate_conversion_rate: 18.5,
+      total_enrolled: 25400,
+      total_revenue_impact: 145000
+    });
+  });
+
+  // Templates
+  app.get('/api/v1/online-ops/templates', (req, res) => {
+    res.json({
+      templates: [
+        {
+          template_id: 'tpl-welcome',
+          name: 'Welcome Series (Main)',
+          type: 'MARKETING',
+          status: 'ACTIVE',
+          ab_test_status: 'ACTIVE',
+          preview_url: 'https://placehold.co/400x600',
+          modified_date: new Date().toISOString(),
+          performance: { open_rate: 45.2, click_rate: 12.1 },
+          content: { subject_line: 'Welcome to the Future!', preview_text: 'Your journey starts here...', personalization_tokens: ['first_name'], dynamic_blocks: ['header', 'footer'] },
+          brand_compliance: { logo_present: true, colors_match: true, tone_score: 98, spam_score: 0.1 }
+        },
+        {
+          template_id: 'tpl-order-conf',
+          name: 'Order Confirmation (Transactional)',
+          type: 'TRANSACTIONAL',
+          status: 'ACTIVE',
+          ab_test_status: 'NOT_APPLICABLE',
+          preview_url: 'https://placehold.co/400x600',
+          modified_date: new Date().toISOString(),
+          performance: { open_rate: 88.5, click_rate: 4.2 },
+          content: { subject_line: 'Your Order #{{order_id}} is Confirmed', preview_text: 'Thank you for your purchase!', personalization_tokens: ['order_id', 'items'], dynamic_blocks: ['receipt'] },
+          brand_compliance: { logo_present: true, colors_match: true, tone_score: 100, spam_score: 0.0 }
+        }
+      ],
+      total_templates: 12,
+      total_active_ab_tests: 4
+    });
+  });
+
+  // Platform Sync Status
+  app.get('/api/v1/online-ops/platform-sync/status', (req, res) => {
+    res.json({
+      connected_platforms: [
+        {
+          platform: 'Klaviyo',
+          connection_type: 'API_KEY',
+          api_version: '2024-02-15',
+          status: 'CONNECTED',
+          latency_ms: 45,
+          latency_status: 'GOOD',
+          last_sync: new Date().toISOString(),
+          sync_frequency: 'REAL_TIME',
+          synced_data: { profiles: 45000, lists: 12, segments: 24, flows: 8, templates: 12, campaigns: 4 },
+          bidirectional_sync: true,
+          conflict_resolution: 'AGENCY_PRIME',
+          webhook_endpoints: ['https://a2a.agency/hooks/klaviyo'],
+          health_checks: { api_connectivity: 'OK', rate_limit_status: 'OK', auth_token_validity: 'VALID', data_consistency: 'STABLE' }
+        }
+      ],
+      available_integrations: [
+        { platform: 'Mailchimp', status: 'AVAILABLE', setup_url: '/settings/integrations/mailchimp' },
+        { platform: 'HubSpot', status: 'AVAILABLE', setup_url: '/settings/integrations/hubspot' }
+      ],
+      sync_logs: [
+        { timestamp: new Date().toISOString(), platform: 'Klaviyo', action: 'SYNC_PROFILES', records_processed: 450, errors: 0, duration_ms: 1200 }
+      ]
+    });
+  });
+
+  // Workflow Audit
+  app.post('/api/v1/online-ops/workflows/audit', (req, res) => {
+    res.json({
+      audit_id: `aud-${Date.now()}`,
+      status: 'COMPLETED',
+      overall_score: 88,
+      findings: [
+        { severity: 'WARNING', category: 'DELIVERABILITY', message: 'Cold Leads segment has 5.2% bounce rate, exceeding 2% threshold.', recommendation: 'Execute List Hygiene Protocol.' },
+        { severity: 'INFO', category: 'PERFORMANCE', message: 'Cart Abandon Mastery is performing 40% above industry benchmark.', recommendation: 'Iterate winning variant for top-of-funnel flows.' },
+        { severity: 'PASS', category: 'COMPLIANCE', message: 'All templates contain required unsubscribe footers.', recommendation: 'N/A' }
+      ],
+      audit_timestamp: new Date().toISOString(),
+      next_scheduled_audit: new Date(Date.now() + 86400000).toISOString()
+    });
+  });
+
+  // Deploy Sequence
+  app.post('/api/v1/online-ops/workflows/deploy-sequence', (req, res) => {
+    res.json({
+      deployment_sequence_id: `ds-${Date.now()}`,
+      status: 'EXECUTING',
+      total_expected_volume: 45000,
+      timeline: [
+        { date: new Date().toISOString(), flows: 3, volume: 15000 },
+        { date: new Date(Date.now() + 86400000).toISOString(), flows: 2, volume: 30000 }
+      ],
+      approval_links: { strategist: '/approvals/ds-123/strat' }
+    });
+  });
+
+  // Online Ops Logs
+  app.get('/api/v1/online-ops/logs', (req, res) => {
+    res.json({
+      logs: [
+        { timestamp: new Date().toISOString(), level: 'INFO', agent: 'SyncManager', action: 'LIST_SYNC', platform: 'Klaviyo', message: 'Successfully synced 450 new profiles from main marketing list.' },
+        { timestamp: new Date(Date.now() - 60000).toISOString(), level: 'WARN', agent: 'ReputationGuard', action: 'THROTTLE_DETECTED', platform: 'Yahoo', message: 'Minimal throttling detected on Yahoo domains. Adjusting throughput.' },
+        { timestamp: new Date(Date.now() - 300000).toISOString(), level: 'ERROR', agent: 'AuthService', action: 'OAUTH_REFRESH', platform: 'Meta', message: 'Failed to refresh OAuth token for tenant agency-meta-1.' }
+      ],
+      total_logs: 150
+    });
+  });
+
+  // Quick Actions
+  app.post('/api/v1/online-ops/actions/quick', (req, res) => {
+    const { action_type, target_segment } = req.body;
+    res.json({
+      action_id: `act-${Date.now()}`,
+      status: 'COMPLETED',
+      message: `${action_type.replace(/_/g, ' ')} executed successfully for ${target_segment || 'all segments'}.`,
+      affected_count: Math.floor(Math.random() * 1000)
+    });
+  });
+
+  // Template Create
+  app.post('/api/v1/online-ops/templates/create', (req, res) => {
+    res.status(201).json({
+      template_id: `tpl-${Date.now()}`,
+      status: 'CREATED',
+      preview_url: 'https://placehold.co/400x600',
+      spam_score_prediction: 0.05,
+      deliverability_forecast: 'EXCELLENT',
+      ab_test_ready: true
+    });
+  });
+
+  // Flow Create
+  app.post('/api/v1/online-ops/flows/create', (req, res) => {
+    res.status(201).json({
+      flow_id: `flow-${Date.now()}`,
+      status: 'CREATED',
+      estimated_enrollment: 1200,
+      projected_conversion_rate: 15.5,
+      projected_revenue_impact: 25000,
+      deployment_ready: true
+    });
+  });
+
+  // Template AB Test winner
+  app.patch('/api/v1/online-ops/templates/:id/ab-test', (req, res) => {
+    res.json({
+      test_id: `test-${req.params.id}`,
+      status: 'WINNER_DECLARED',
+      winner: 'Variant B',
+      winning_metrics: { open_rate: 48.2, click_rate: 14.5, conversion_lift: '+12%' },
+      rollout_status: 'IN_PROGRESS',
+      estimated_completion: new Date(Date.now() + 3600000).toISOString()
+    });
+  });
+
+  // Segment Health
+  app.get('/api/v1/online-ops/audience/segments/:id/health', (req, res) => {
+    res.json({
+      segment_id: req.params.id,
+      health_score: 92,
+      health_breakdown: { list_quality: 95, engagement_velocity: 88, deliverability_reputation: 96, content_relevance: 90 },
+      recommendations: [
+        { priority: 'MEDIUM', action: 'Rotate Creatives', description: 'Engagement velocity is stabilizing.', projected_health_improvement: 5 }
+      ]
+    });
+  });
+
+  // --- CIRCUIT BREAKER & SCHEMA UTILS ---
+  const retryRegistry = new Map<string, number>();
+  const MAX_RETRY_THRESHOLD = 3;
+
+  const sanitizeSchema = (data: any) => {
+    // Normalizes marketing API oddities (e.g., Klaviyo's inconsistent date formats)
+    const sanitized = { ...data };
+    if (sanitized.timestamp && !isNaN(Date.parse(sanitized.timestamp))) {
+      sanitized.timestamp = new Date(sanitized.timestamp).toISOString();
+    }
+    // Remove internal noise fields to save tokens
+    delete sanitized.__v;
+    delete sanitized._internal_meta;
+    return sanitized;
+  };
+
+  const minifyLog = (log: string) => {
+    // Strips stack trace noise, keeps relevant error paths
+    return log
+      .split('\n')
+      .filter(line => line.includes('/src/') || line.includes('Error:'))
+      .join('\n')
+      .substring(0, 500); // Token limit protection
+  };
+
+  // --- MAINTENANCE & VALIDATION AGENT ENDPOINTS ---
+
+  // Trigger Audit
+  app.post('/api/v1/maintenance/trigger-audit', (req, res) => {
+    const timestamp = new Date().toISOString();
+    const auditData = sanitizeSchema({
+      audit_id: `maint-aud-${Date.now()}`,
+      timestamp: timestamp,
+      summary: {
+        verified: 124,
+        updates_applied: 3,
+        integrity_score: 98
+      },
+      logs: [
+        {
+          status: 'update_needed',
+          target_field: 'klaviyo_api_token',
+          new_value: '************K93B',
+          timestamp: timestamp,
+          message: 'Token near expiration. Rotated via Gemini 2.0 security protocol.'
+        },
+        {
+          status: 'verified',
+          target_field: 'abandoned_cart_redirect_uri',
+          new_value: 'https://a2a.agency/cart/recovery',
+          timestamp: timestamp,
+          message: 'Integrity check passed. URI is reachable and SSL valid.'
+        }
+      ]
+    });
+    res.json(auditData);
+  });
+
+  // Audit Logs
+  app.get('/api/v1/maintenance/audit-logs', (req, res) => {
+    res.json({
+      logs: [
+        {
+          status: 'verified',
+          target_field: 'campaign_tokens',
+          new_value: 'VALID',
+          timestamp: new Date(Date.now() - 3600000).toISOString(),
+          message: 'Routine validation check.'
+        }
+      ]
+    });
+  });
+
+  // --- LEAD A2A DEVELOPER AGENT ENDPOINTS ---
+
+  // Get Developer Logs
+  app.get('/api/v1/developer/logs', (req, res) => {
+    res.json({
+      logs: [
+        {
+          id: `dev-err-1`,
+          timestamp: new Date().toISOString(),
+          level: 'error',
+          error_code: 500,
+          message: 'Internal Error Occurred: Klaviyo API timeout on Campaign Sync.',
+          target_api: 'Klaviyo',
+          status: 'active',
+          stack_trace: 'Error: Request timed out after 30000ms\n    at KlaviyoClient.syncCampaigns (/src/services/klaviyo.ts:145:23)...'
+        }
+      ]
+    });
+  });
+
+  // Trigger Auto-Fix
+  app.post('/api/v1/developer/auto-fix', (req, res) => {
+    const { error_id, raw_log } = req.body;
+    
+    if (!error_id) return res.status(400).json({ error: 'Missing error_id' });
+
+    // Infinite Loop Protection
+    const currentRetries = retryRegistry.get(error_id) || 0;
+    if (currentRetries >= MAX_RETRY_THRESHOLD) {
+      return res.status(429).json({
+        error: 'Infinite Helpfulness Loop Detected',
+        message: `Escalating to human Developer Agent. Fix failed ${currentRetries} times.`,
+        status: 'escalated'
+      });
+    }
+
+    retryRegistry.set(error_id, currentRetries + 1);
+
+    const minified = raw_log ? minifyLog(raw_log) : 'No raw log provided';
+
+    res.json({
+      fix_id: `fix-${Date.now()}`,
+      status: 'applied',
+      diff: `--- a/src/services/klaviyo.ts\n+++ b/src/services/klaviyo.ts\n@@ -145,1 +145,1 @@\n-    timeout: 30000,\n+    timeout: 60000, // Normalized for execution limits`,
+      error_log: minified,
+      validation_message: 'Protocol fix verified in Gemini 2.0 sandbox (30s execution limit respected).',
+      retry_count: currentRetries + 1
+    });
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({

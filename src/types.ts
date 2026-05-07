@@ -262,6 +262,284 @@ export interface TenantBranding {
   };
 }
 
+export interface AttributionModel {
+  model: string;
+  description: string;
+  recommended?: boolean;
+  eligibility?: string;
+}
+
+export interface AttributionModelsResponse {
+  current_model: string;
+  available_models: AttributionModel[];
+}
+
+export interface PacingDetailsResponse {
+  shard_id: string;
+  pacing_percentage: number;
+  daily_target: number;
+  actual_spend_today: number;
+  projected_month_spend: number;
+  projected_underspend: number;
+  recommendation: 'INCREASE_BUDGET_OR_REALLOCATE' | 'STABLE' | 'DECREASE_BUDGET';
+  reallocation_targets?: string[];
+}
+
+export interface PPCCampaignShard {
+  shard_id: string;
+  campaign_name: string;
+  campaign_type: 'SEARCH' | 'PERFORMANCE_MAX' | 'DISPLAY' | 'VIDEO' | 'PERFORMANCE_MAX';
+  status: 'ENABLED' | 'PAUSED' | 'REMOVED';
+  budget: {
+    daily_amount: number;
+    monthly_pacing: number;
+    pacing_percentage: number;
+    pacing_status: 'UNDER_BUDGET' | 'ON_TRACK' | 'OVER_BUDGET';
+  };
+  performance: {
+    conversions: number;
+    conversion_value: number;
+    roas: number;
+    cost_per_conversion: number;
+    impressions: number;
+    clicks: number;
+    ctr: number;
+  };
+  bid_strategy: string;
+  target_roas?: number;
+  target_cpa?: number;
+  attribution_model: string;
+  asset_groups?: number;
+  keywords?: number;
+  ad_groups?: number;
+  quality_score_avg?: number;
+  last_optimized: string;
+  adStrength?: 'Poor' | 'Average' | 'Good' | 'Excellent';
+}
+
+export interface ActiveShardsResponse {
+  shards: PPCCampaignShard[];
+  total_active_shards: number;
+  total_monthly_spend: number;
+  portfolio_roas: number;
+}
+
+export interface BidSimulationResponse {
+  simulation_id: string;
+  status: string;
+  simulation_date: string;
+  results: {
+    current_performance: {
+      conversions: number;
+      conversion_value: number;
+      cost: number;
+      roas: number;
+      cpa: number;
+    };
+    projected_performance: {
+      conversions: number;
+      conversion_value: number;
+      cost: number;
+      roas: number;
+      cpa: number;
+    };
+    delta: {
+      conversions: string;
+      conversion_value: string;
+      cost: string;
+      roas: string;
+      cpa: string;
+    };
+    confidence_interval: {
+      lower_bound_roas: number;
+      upper_bound_roas: number;
+      confidence_level: number;
+    };
+  };
+  recommendation: string;
+  risk_assessment: string;
+}
+
+export interface PPCQuickActionRequest {
+  manager_customer_id: string;
+  action_type: 'PAUSE_UNDERPERFORMING' | 'INCREASE_BUDGET_HIGH_ROAS' | 'REFRESH_CREATIVES' | 'SYNC_CONVERSIONS' | 'GENERATE_REPORT' | 'RUN_BID_SIMULATION' | 'EXPORT_DATA' | 'NOTIFY_CLIENT';
+  scope: string;
+  threshold?: {
+    metric: string;
+    operator: string;
+    value: number;
+    lookback_days: number;
+  };
+  approval_required: boolean;
+}
+
+export interface PPCQuickActionResponse {
+  action_id: string;
+  status: 'PENDING_APPROVAL' | 'EXECUTING' | 'COMPLETED' | 'FAILED';
+  message: string;
+  affected_entities_count?: number;
+}
+
+export interface BidSimulationHistoryItem {
+  simulation_id: string;
+  type: string;
+  date: string;
+  result: 'POSITIVE' | 'NEGATIVE' | 'NEUTRAL';
+  applied: boolean;
+  projected_roas: number;
+}
+
+export interface BidSimulationHistoryResponse {
+  simulations: BidSimulationHistoryItem[];
+}
+
+export interface SmartBiddingStatus {
+  shard_id: string;
+  strategy: string;
+  learning_status: 'LEARNING' | 'STABLE' | 'LIMITED';
+  learning_days_remaining: number;
+  data_sufficiency: 'OPTIMAL' | 'LOW' | 'INSUFFICIENT';
+  conversion_volume_30d: number;
+  recommendation: string;
+}
+
+export interface PPCStreamEvent {
+  event: 'SHARD_PERFORMANCE_UPDATE' | 'BUDGET_PACING_ALERT' | 'BID_SIMULATION_COMPLETE' | 'OPTIMIZATION_PROPOSED' | 'OPTIMIZATION_APPLIED' | 'QUALITY_SCORE_CHANGE' | 'CONVERSION_LAG_UPDATE';
+  timestamp: string;
+  shard_id: string;
+  metrics?: {
+    conversions?: number;
+    roas?: number;
+    pacing?: number;
+    cost_today?: number;
+  };
+  status?: 'HEALTHY' | 'WARNING' | 'CRITICAL';
+  agent_action?: string;
+  message?: string;
+  payload?: any;
+}
+
+export interface PPCPlanStatusResponse {
+  plan: string;
+  features_enabled: string[];
+  usage: {
+    clients_active: number;
+    clients_limit: number;
+    monthly_spend_managed: number;
+    spend_limit: number;
+  };
+  upgrade_available: string;
+}
+
+export interface A2ASystemStatusResponse {
+  a2a_sync: 'ACTIVE' | 'INACTIVE' | 'MAINTENANCE';
+  protocol_version: string;
+  connected_agents: string[];
+  last_sync: string;
+  sync_health: 'OPTIMAL' | 'DEGRADED' | 'CRITICAL';
+}
+
+export interface CloudStatusResponse {
+  provider: string;
+  region: string;
+  status: 'OPERATIONAL' | 'DEGRADED' | 'OUTAGE';
+  latency_ms: number;
+  uptime_30d: number;
+}
+
+export interface PPCLog {
+  timestamp: string;
+  level: 'INFO' | 'WARN' | 'ERROR';
+  agent: string;
+  action: string;
+  shard_id?: string;
+  message: string;
+  data?: any;
+}
+
+export interface PPCLogsResponse {
+  logs: PPCLog[];
+  total_logs: number;
+  next_page_token?: string;
+}
+
+export interface SmartBiddingAdjustmentResponse {
+  adjustment_id: string;
+  status: string;
+  step_schedule: {
+    day: number;
+    target: number;
+  }[];
+  monitoring_alerts: string[];
+}
+
+export interface SmartBiddingStatusResponse {
+  version: string;
+  active_strategies: SmartBiddingStatus[];
+  portfolio_learning_status: string;
+  smart_bidding_health_score: number;
+}
+
+export interface OptimizationProposal {
+  approval_id: string;
+  confidence_score: number;
+  proposed_changes: {
+    campaign_id: string;
+    field: string;
+    current_value: number;
+    proposed_value: number;
+    impact_forecast: string;
+  }[];
+  justification: string;
+}
+
+export interface OptimizationApprovalResponse {
+  status: string;
+  changes_applied: number;
+  affected_shards: string[];
+  implementation_log: {
+    shard_id: string;
+    action: string;
+    old_value: number;
+    new_value: number;
+    timestamp: string;
+    google_ads_api_response: string;
+  }[];
+  post_optimization_monitoring: {
+    monitor_duration_hours: number;
+    alert_thresholds: {
+      roas_drop: number;
+      cpa_spike: number;
+      pacing_acceleration: number;
+    };
+  };
+}
+
+export interface MCCManager {
+  name: string;
+  customer_id: string;
+  currency: string;
+  timezone: string;
+  status: string;
+}
+
+export interface LinkedClient {
+  customer_id: string;
+  name: string;
+  status: 'ACTIVE' | 'WARNING' | 'PAUSED' | 'REMOVED';
+  status_indicator: 'green' | 'red' | 'yellow';
+  monthly_budget: number;
+  ytd_spend: number;
+  alert?: string;
+}
+
+export interface PPCManagerResponse {
+  manager_account: MCCManager;
+  linked_clients: LinkedClient[];
+  total_linked_accounts: number;
+  total_monthly_budget: number;
+}
+
 export type Pillar = 'online' | 'social' | 'seo' | 'ppc';
 export type Tab = 'overview' | 'online' | 'social' | 'seo' | 'ppc' | 'approvals' | 'clients' | 'protocol' | 'media' | 'personas' | 'collaboration' | 'settings' | 'vibe-library' | 'agency-config';
 
@@ -392,6 +670,148 @@ export interface EmailSegment {
   };
 }
 
+export interface AudienceSegmentDeliverability {
+  inbox_placement: number;
+  domain_reputation: 'EXCELLENT' | 'GOOD' | 'POOR';
+  ip_warming_status: 'COMPLETE' | 'IN_PROGRESS' | 'PENDING';
+  provider_breakdown: {
+    gmail: number;
+    outlook: number;
+    yahoo: number;
+    corporate: number;
+  };
+  warnings?: string[];
+}
+
+export interface AudienceSegmentDetail {
+  segment_id: string;
+  name: string;
+  identifier: string;
+  subscriber_count: number;
+  health_score: number;
+  health_status: 'EXCELLENT' | 'GOOD' | 'CRITICAL';
+  open_rate: number;
+  bounce_rate: number;
+  spam_rate: number;
+  sync_status: 'SYNCED' | 'INDEXING' | 'ERROR';
+  last_sync: string;
+  source: string;
+  criteria: Record<string, any>;
+  deliverability: AudienceSegmentDeliverability;
+}
+
+export interface AudienceSegmentsResponse {
+  segments: AudienceSegmentDetail[];
+  total_subscribers: number;
+  aggregate_health: number;
+  last_updated: string;
+}
+
+export interface CreateAudienceSegmentRequest {
+  name: string;
+  identifier: string;
+  criteria: Record<string, any>;
+  source: string;
+  auto_sync: boolean;
+  sync_frequency: 'REAL_TIME' | 'HOURLY' | 'DAILY';
+}
+
+export interface CreateAudienceSegmentResponse {
+  segment_id: string;
+  status: 'CREATED';
+  estimated_subscriber_count: number;
+  sync_status: 'INDEXING';
+  health_projection: 'EXCELLENT' | 'GOOD' | 'CRITICAL';
+  deliverability_forecast: {
+    inbox_placement: number;
+    recommended_send_volume: number;
+    ip_warming_required: boolean;
+  };
+}
+
+export interface SegmentHealthRecommendation {
+  priority: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  action: string;
+  description: string;
+  projected_health_improvement: number;
+}
+
+export interface SegmentHealthResponse {
+  segment_id: string;
+  health_score: number;
+  health_breakdown: {
+    list_quality: number;
+    engagement_velocity: number;
+    deliverability_reputation: number;
+    content_relevance: number;
+  };
+  recommendations: SegmentHealthRecommendation[];
+}
+
+export interface ReputationAlert {
+  timestamp: string;
+  severity: 'CRITICAL' | 'WARNING' | 'INFO';
+  message: string;
+  action_taken: string;
+  resolution_time_minutes: number;
+}
+
+export interface ReputationMonitorResponse {
+  domain_status: 'EXCELLENT' | 'GOOD' | 'POOR';
+  domain_reputation_score: number;
+  ip_warming_status: {
+    current_phase: string;
+    days_in_phase: number;
+    daily_send_limit: number;
+    recommended_daily_volume: number;
+    warming_progress: number;
+  };
+  provider_side_throttling: {
+    [key: string]: {
+      status: string;
+      inbox_rate: number;
+      throttle_detected: boolean;
+      note?: string;
+    };
+  };
+  ip_warming_latency_grid: {
+    grid_size: string;
+    cells: {
+      day: number;
+      volume: number;
+      latency_ms: number;
+      status: string;
+    }[];
+    visualization: string;
+    trend: 'IMPROVING' | 'STABLE' | 'DECLINING';
+  };
+  alert_history: ReputationAlert[];
+  recommendations: string[];
+}
+
+export interface IPWarmingControlRequest {
+  action: 'ADJUST_VOLUME' | 'PAUSE' | 'RESUME';
+  new_daily_limit: number;
+  ramp_schedule: {
+    type: 'GRADUAL' | 'FIXED';
+    increment_percentage: number;
+    increment_interval_days: number;
+  };
+  target_providers: string[];
+}
+
+export interface IPWarmingControlResponse {
+  warming_id: string;
+  status: 'SCHEDULED' | 'ACTIVE' | 'PAUSED';
+  current_volume: number;
+  target_volume: number;
+  ramp_schedule: {
+    day: number;
+    volume: number;
+  }[];
+  monitoring_alerts: string[];
+}
+
 export interface AutomationWorkflow {
   id: string;
   name: string;
@@ -400,6 +820,432 @@ export interface AutomationWorkflow {
   activeSubscribers: number;
   conversionRate: number;
   status: 'active' | 'paused';
+}
+
+export interface AutomationFlowDetail {
+  flow_id: string;
+  name: string;
+  trigger_type: string;
+  trigger_threshold?: number;
+  status: 'RUNNING' | 'PAUSED' | 'DRAFT';
+  steps: number;
+  conversion_rate: number;
+  conversion_status: 'WARMING_UP' | 'PERFORMING' | 'HIGH_PERFORMING' | 'EXCEPTIONAL';
+  enrolled_contacts: number;
+  completed_contacts: number;
+  active_contacts: number;
+  last_triggered: string;
+  next_scheduled: string;
+  performance: {
+    email_1_open_rate?: number | null;
+    email_2_open_rate?: number | null;
+    email_3_open_rate?: number | null;
+    email_4_open_rate?: number | null;
+    email_5_open_rate?: number | null;
+    click_rate: number;
+    unsubscribe_rate: number;
+    trial_to_paid_conversion?: number;
+    cart_recovery_rate?: number;
+    revenue_recovered?: number;
+    nps_score?: number;
+    expansion_revenue?: number;
+  };
+  ai_optimization: {
+    enabled: boolean;
+    last_optimized: string;
+    optimization_type: string;
+    projected_improvement: string;
+  };
+}
+
+export interface ActiveFlowsResponse {
+  flows: AutomationFlowDetail[];
+  total_active_flows: number;
+  aggregate_conversion_rate: number;
+  total_enrolled: number;
+  total_revenue_impact: number;
+}
+
+export interface CreateAutomationFlowRequest {
+  name: string;
+  trigger_type: string;
+  trigger_criteria: {
+    days_since_last_open: number;
+    days_since_last_click: number;
+    days_since_last_purchase: number;
+  };
+  steps: {
+    step_number: number;
+    delay_hours: number;
+    channel: 'EMAIL' | 'SMS' | 'WHATSAPP';
+    template_id: string;
+    subject: string;
+    personalization: boolean;
+    ab_test?: {
+      enabled: boolean;
+      variants: string[];
+      split: number;
+    };
+    conditional_logic?: any;
+    exit_condition?: any;
+  }[];
+  conversion_goal: string;
+  success_metrics: string[];
+}
+
+export interface CreateAutomationFlowResponse {
+  flow_id: string;
+  status: 'CREATED' | 'ACTIVE';
+  estimated_enrollment: number;
+  projected_conversion_rate: number;
+  projected_revenue_impact: number;
+  deployment_ready: boolean;
+}
+
+export interface FlowDeploymentRequest {
+  deployment_mode: 'GRADUAL' | 'IMMEDIATE';
+  rollout_percentage: number;
+  monitoring_window_hours: number;
+  auto_scale_threshold: {
+    metric: string;
+    operator: string;
+    value: number;
+  };
+  approval_required: boolean;
+}
+
+export interface FlowDeploymentResponse {
+  deployment_id: string;
+  status: 'DEPLOYING';
+  rollout_progress: number;
+  monitoring_dashboard: string;
+  estimated_full_deployment: string;
+}
+
+export interface EmailTemplateDetail {
+  template_id: string;
+  name: string;
+  type: 'MARKETING' | 'TRANSACTIONAL';
+  status: 'ACTIVE' | 'DRAFT' | 'ARCHIVED';
+  ab_test_status: 'ACTIVE' | 'NOT_APPLICABLE' | 'ARCHIVED';
+  preview_url: string;
+  modified_date: string;
+  performance: {
+    open_rate?: number;
+    click_rate?: number;
+    conversions?: number | string;
+    variant_a?: {
+      name: string;
+      open_rate: number;
+      click_rate: number;
+      conversions: number;
+    };
+    variant_b?: {
+      name: string;
+      open_rate: number;
+      click_rate: number;
+      conversions: number;
+      lift_vs_control: string;
+    };
+    winner?: string;
+    confidence?: number;
+    recommended_action?: string;
+  };
+  content: {
+    subject_line: string;
+    preview_text: string;
+    personalization_tokens: string[];
+    dynamic_blocks: string[];
+  };
+  brand_compliance: {
+    logo_present: boolean;
+    colors_match: boolean;
+    tone_score: number;
+    spam_score: number;
+  };
+}
+
+export interface TemplatesResponse {
+  templates: EmailTemplateDetail[];
+  total_templates: number;
+  total_active_ab_tests: number;
+}
+
+export interface CreateTemplateRequest {
+  name: string;
+  type: 'MARKETING' | 'TRANSACTIONAL';
+  subject_line: string;
+  preview_text: string;
+  content_blocks: {
+    type: string;
+    content: string;
+    personalization: boolean;
+    url?: string;
+  }[];
+  ab_test?: {
+    enabled: boolean;
+    variants: {
+      name: string;
+      subject_line: string;
+      hero_image: string;
+    }[];
+    split: number;
+    winner_criteria: string;
+    test_duration_days: number;
+  };
+  brand_guidelines: {
+    primary_color: string;
+    font_family: string;
+    logo_position: string;
+    footer_required: boolean;
+  };
+}
+
+export interface CreateTemplateResponse {
+  template_id: string;
+  status: 'CREATED';
+  preview_url: string;
+  spam_score_prediction: number;
+  deliverability_forecast: 'EXCELLENT' | 'GOOD' | 'POOR';
+  ab_test_ready: boolean;
+}
+
+export interface ABTestWinnerRequest {
+  action: 'DECLARE_WINNER';
+  winner_variant: string;
+  rollout_percentage: number;
+  archive_loser: boolean;
+}
+
+export interface ABTestWinnerResponse {
+  test_id: string;
+  status: 'WINNER_DECLARED';
+  winner: string;
+  winning_metrics: {
+    open_rate: number;
+    click_rate: number;
+    conversion_lift: string;
+  };
+  rollout_status: 'IN_PROGRESS';
+  estimated_completion: string;
+}
+
+export interface PlatformSyncStatus {
+  platform: string;
+  connection_type: string;
+  api_version: string;
+  status: 'CONNECTED' | 'DISCONNECTED' | 'ERROR' | 'PENDING' | 'AVAILABLE';
+  latency_ms: number;
+  latency_status: 'GOOD' | 'FAIR' | 'POOR';
+  last_sync: string;
+  sync_frequency: string;
+  synced_data: {
+    profiles: number;
+    lists: number;
+    segments: number;
+    flows: number;
+    templates: number;
+    campaigns: number;
+  };
+  bidirectional_sync: boolean;
+  conflict_resolution: string;
+  webhook_endpoints: string[];
+  health_checks: {
+    api_connectivity: string;
+    rate_limit_status: string;
+    auth_token_validity: string;
+    data_consistency: string;
+  };
+}
+
+export interface AvailableIntegration {
+  platform: string;
+  status: 'AVAILABLE' | 'CONNECTED';
+  setup_url: string;
+}
+
+export interface SyncLog {
+  timestamp: string;
+  platform: string;
+  action: string;
+  records_processed: number;
+  errors: number;
+  duration_ms: number;
+}
+
+export interface PlatformSyncResponse {
+  connected_platforms: PlatformSyncStatus[];
+  available_integrations: AvailableIntegration[];
+  sync_logs: SyncLog[];
+}
+
+export interface ConnectPlatformRequest {
+  platform: string;
+  auth_method: 'OAUTH2' | 'API_KEY';
+  scopes: string[];
+  sync_config: {
+    direction: 'BIDIRECTIONAL' | 'UNIDIRECTIONAL';
+    sync_frequency: string;
+    conflict_resolution: string;
+    field_mapping: Record<string, string>;
+  };
+}
+
+export interface ConnectPlatformResponse {
+  connection_id: string;
+  status: 'PENDING_AUTH' | 'CONNECTED' | 'ERROR';
+  oauth_url?: string;
+  setup_instructions: string;
+  estimated_setup_time: string;
+}
+
+export interface WorkflowAuditRequest {
+  audit_scope: 'ALL_FLOWS';
+  audit_type: 'COMPLIANCE_PERFORMANCE_DELIVERABILITY';
+  check_items: string[];
+}
+
+export interface WorkflowAuditFinding {
+  severity: 'INFO' | 'WARNING' | 'PASS' | 'CRITICAL';
+  category: 'PERFORMANCE' | 'DELIVERABILITY' | 'COMPLIANCE';
+  message: string;
+  recommendation: string;
+}
+
+export interface WorkflowAuditResponse {
+  audit_id: string;
+  status: 'COMPLETED' | 'IN_PROGRESS' | 'FAILED';
+  overall_score: number;
+  findings: WorkflowAuditFinding[];
+  audit_timestamp: string;
+  next_scheduled_audit: string;
+}
+
+export interface DeploymentSequenceItem {
+  flow_id: string;
+  deploy_date: string;
+  target_segment: string;
+  expected_volume: number;
+  throttle?: {
+    enabled: boolean;
+    daily_limit: number;
+    ramp_days: number;
+  };
+}
+
+export interface DeploymentSequenceRequest {
+  sequence_name: string;
+  deployments: DeploymentSequenceItem[];
+  approval_workflow: {
+    requires_approval: boolean;
+    approvers: string[];
+    approval_deadline: string;
+  };
+}
+
+export interface DeploymentSequenceResponse {
+  deployment_sequence_id: string;
+  status: 'PENDING_APPROVAL' | 'SCHEDULED' | 'EXECUTING' | 'COMPLETED';
+  total_expected_volume: number;
+  timeline: {
+    date: string;
+    flows: number;
+    volume: number;
+  }[];
+  approval_links: Record<string, string>;
+}
+
+export type WSEventType = 
+  | 'SEGMENT_SYNC_COMPLETE'
+  | 'REPUTATION_ALERT'
+  | 'FLOW_CONVERSION_UPDATE'
+  | 'TEMPLATE_AB_TEST_MILESTONE'
+  | 'PLATFORM_SYNC_STATUS_CHANGE'
+  | 'DEPLOYMENT_STATUS_UPDATE'
+  | 'AUDIT_FINDING';
+
+export interface BaseWSPayload {
+  event: WSEventType;
+  timestamp: string;
+}
+
+export interface FlowConversionPayload extends BaseWSPayload {
+  event: 'FLOW_CONVERSION_UPDATE';
+  flow_id: string;
+  conversion_rate: number;
+  delta: string;
+  enrolled_today: number;
+  converted_today: number;
+  revenue_today: number;
+  ai_recommendation: string;
+}
+
+export interface ReputationAlertPayload extends BaseWSPayload {
+  event: 'REPUTATION_ALERT';
+  severity: 'CRITICAL' | 'WARNING' | 'INFO';
+  message: string;
+  metric: string;
+  current_value: number;
+  threshold: number;
+}
+
+export interface PlatformSyncStatusPayload extends BaseWSPayload {
+  event: 'PLATFORM_SYNC_STATUS_CHANGE';
+  platform: string;
+  new_status: string;
+  message: string;
+}
+
+export interface AuditFindingPayload extends BaseWSPayload {
+  event: 'AUDIT_FINDING';
+  audit_id: string;
+  finding: WorkflowAuditFinding;
+}
+
+export type WSPayload = 
+  | FlowConversionPayload 
+  | ReputationAlertPayload 
+  | PlatformSyncStatusPayload 
+  | AuditFindingPayload
+  | BaseWSPayload;
+
+export interface OAuthStatusResponse {
+  authenticated: boolean;
+  provider?: string;
+  expires_at?: string;
+  scopes?: string[];
+  tenant_id: string;
+}
+
+export interface OnlineOpsLog {
+  timestamp: string;
+  level: 'INFO' | 'WARN' | 'ERROR';
+  agent: string;
+  action: string;
+  platform?: string;
+  segment_id?: string;
+  message: string;
+  data?: any;
+}
+
+export interface OnlineOpsLogsResponse {
+  logs: OnlineOpsLog[];
+  total_logs: number;
+  next_page_token?: string;
+}
+
+export interface OnlineOpsQuickActionRequest {
+  action_type: 'RUN_LIST_HYGIENE' | 'PAUSE_UNDERPERFORMING_FLOWS' | 'DEPLOY_WINNING_VARIANT' | 'SYNC_PLATFORM_NOW' | 'GENERATE_DELIVERABILITY_REPORT' | 'EXPORT_SEGMENT_DATA' | 'TRIGGER_RE_ENGAGEMENT' | 'NOTIFY_CLIENT_STATUS';
+  target_segment?: string;
+  hygiene_rules?: string[];
+  approval_required: boolean;
+}
+
+export interface OnlineOpsQuickActionResponse {
+  action_id: string;
+  status: 'COMPLETED' | 'PENDING' | 'EXECUTING' | 'FAILED';
+  message: string;
+  affected_count?: number;
 }
 
 export interface EmailVariant {
@@ -422,6 +1268,45 @@ export interface EmailTemplate {
   lastModified: string;
   placeholders: string[];
   abTestingActive: boolean;
+}
+
+export interface MaintenanceAgentLog {
+  status: 'verified' | 'update_needed';
+  target_field: string;
+  new_value: string;
+  timestamp: string;
+  message?: string;
+}
+
+export interface MaintenanceAuditResponse {
+  audit_id: string;
+  timestamp: string;
+  summary: {
+    verified: number;
+    updates_applied: number;
+    integrity_score: number;
+  };
+  logs: MaintenanceAgentLog[];
+}
+
+export interface DeveloperAgentLog {
+  id: string;
+  timestamp: string;
+  level: 'info' | 'warn' | 'error' | 'fatal';
+  error_code: number;
+  message: string;
+  stack_trace?: string;
+  target_api?: string;
+  status: 'active' | 'fixing' | 'resolved' | 'escalated';
+}
+
+export interface DeveloperFixResponse {
+  fix_id: string;
+  status: 'testing' | 'applied' | 'failed';
+  diff: string;
+  error_log: string;
+  validation_message: string;
+  retry_count: number;
 }
 
 export interface SEOMetric {

@@ -31,8 +31,48 @@ import {
   TrainingJob,
   AgencyTemplate,
   SubscriptionTier,
-  TenantBranding
+  TenantBranding,
+  PPCManagerResponse
 } from './types';
+
+export const PPC_MANAGER_DATA: PPCManagerResponse = {
+  manager_account: {
+    name: "Digital Marketing Agency",
+    customer_id: "123-456-7890",
+    currency: "USD",
+    timezone: "America/New_York",
+    status: "ACTIVE"
+  },
+  linked_clients: [
+    {
+      customer_id: "421",
+      name: "Core Retail",
+      status: "ACTIVE",
+      status_indicator: "green",
+      monthly_budget: 50000,
+      ytd_spend: 187500
+    },
+    {
+      customer_id: "981",
+      name: "SaaS Cluster",
+      status: "ACTIVE",
+      status_indicator: "green",
+      monthly_budget: 75000,
+      ytd_spend: 312000
+    },
+    {
+      customer_id: "104",
+      name: "Legal Services",
+      status: "WARNING",
+      status_indicator: "red",
+      monthly_budget: 25000,
+      ytd_spend: 28750,
+      alert: "OVERSPEND_RISK"
+    }
+  ],
+  total_linked_accounts: 3,
+  total_monthly_budget: 150000
+};
 
 export const SUBSCRIPTION_TIERS: SubscriptionTier[] = [
   {
@@ -231,15 +271,16 @@ export const LOCAL_SEO: LocalSEOMetrics = {
 };
 
 export const EMAIL_SEGMENTS: EmailSegment[] = [
-  { id: 'seg-1', name: 'High-Value SaaS Buyers', count: 12400, engagementScore: 92, status: 'synced', deliverability: { bounceRate: 0.8, openRate: 42.5, spamReport: 0.02 } },
-  { id: 'seg-2', name: 'Abandoned Cart (Retail)', count: 4500, engagementScore: 68, status: 'synced', deliverability: { bounceRate: 2.4, openRate: 12.1, spamReport: 0.15 } },
-  { id: 'seg-3', name: 'Cold Leads (Re-engagement)', count: 28000, engagementScore: 12, status: 'indexing', deliverability: { bounceRate: 5.2, openRate: 2.1, spamReport: 0.45 } }
+  { id: 'seg-1', name: 'High-Value SaaS Buyers', count: 12400, engagementScore: 91, status: 'synced', deliverability: { bounceRate: 0.8, openRate: 42.5, spamReport: 0.02 } },
+  { id: 'seg-2', name: 'Abandoned Cart Retail', count: 4560, engagementScore: 67, status: 'synced', deliverability: { bounceRate: 2.4, openRate: 12.1, spamReport: 0.83 } },
+  { id: 'seg-3', name: 'Cold Leads Re-engagement', count: 28000, engagementScore: 14, status: 'indexing', deliverability: { bounceRate: 5.2, openRate: 2.1, spamReport: 0.45 } }
 ];
 
 export const AUTOMATION_WORKFLOWS: AutomationWorkflow[] = [
-  { id: 'flow-1', name: 'Nurture: SaaS Trial', trigger: 'Sign-up', steps: 5, activeSubscribers: 1250, conversionRate: 14.5, status: 'active' },
-  { id: 'flow-2', name: 'Recovery: Cart Abandon', trigger: 'Cart Event', steps: 3, activeSubscribers: 840, conversionRate: 22.1, status: 'active' },
-  { id: 'flow-3', name: 'Onboarding: High-Touch', trigger: 'Purchase > $500', steps: 8, activeSubscribers: 120, conversionRate: 45.0, status: 'paused' }
+  { id: 'flow-0', name: 'AI Nurture', trigger: 'Generic Interest', steps: 3, activeSubscribers: 0, conversionRate: 0, status: 'active' },
+  { id: 'flow-1', name: 'SaaS Trial', trigger: 'Sign-up', steps: 5, activeSubscribers: 1250, conversionRate: 14.5, status: 'active' },
+  { id: 'flow-2', name: 'Cart Abandon', trigger: 'Cart Event', steps: 3, activeSubscribers: 840, conversionRate: 22.0, status: 'active' },
+  { id: 'flow-3', name: 'High-Touch Onboarding', trigger: 'Purchase > $500', steps: 8, activeSubscribers: 120, conversionRate: 45.0, status: 'active' }
 ];
 
 export const EMAIL_TEMPLATES: EmailTemplate[] = [
@@ -480,8 +521,8 @@ export const AGENTS: AgentCard[] = [
   { 
     id: 'online-marketing-agent', 
     name: 'Online Marketing Agent', 
-    version: 'v1.0.4', 
-    capabilities: ['Email Automation', 'Affiliate Mgmt', 'CRO'], 
+    version: 'v4.1.0', 
+    capabilities: ['Audience Segmentation', 'Deliverability Optimization', 'Reputation Monitoring', 'Active Flow Management', 'A/B Test Asset Library', 'Klaviyo/CRM Sync'], 
     status: 'available', 
     endpoint: '/.well-known/agent.json', 
     pillar: 'online' 
