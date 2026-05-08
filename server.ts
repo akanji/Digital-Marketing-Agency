@@ -929,6 +929,250 @@ async function startServer() {
     });
   });
 
+  // --- QUERY AGENT ENDPOINTS ---
+
+  app.post('/api/v1/query/process', (req, res) => {
+    const { query, context } = req.body;
+
+    if (!query) {
+      return res.status(400).json({ error: 'Query is required' });
+    }
+
+    console.log(`[Query Agent] Processing: "${query}" for tenant: ${context?.tenant_id}`);
+
+    // Mock intelligent responses based on prompt examples
+    let response: any = {
+      answer: "I've analyzed your agency metadata and connected platforms. Your overall performance is stable, but there are opportunities for optimization in your high-value segments.",
+      supporting_data: {
+        metrics: { roas: '4.2x', spend: '$12,450', conversion: '5.2%' },
+        charts: [
+          { type: 'bar', title: 'Spend by Pillar', data: [{ name: 'PPC', value: 4500 }, { name: 'Social', value: 3000 }, { name: 'SEO', value: 2000 }] }
+        ],
+        sources: ['Google Ads API', 'Meta Insights', 'Klaviyo Segment Data']
+      },
+      confidence_score: 0.94,
+      recommended_actions: ["Increase budget for PMax campaign", "Execute re-engagement flow for cold leads"],
+      related_questions: ["What is my churn risk for this month?", "Show me detailed attribution for the SaaS client"]
+    };
+
+    if (query.toLowerCase().includes('spend')) {
+      response.answer = "Your current monthly ad spend across all clients is $145,000, which is pacing 12% below budget thresholds.";
+      response.supporting_data.metrics = { total_spend: '$145,000', pacing: '-12%', budget_utilization: '88%' };
+    } else if (query.toLowerCase().includes('roas')) {
+      response.answer = "The campaign with the highest ROAS this week is the 'PMax E-commerce Global' campaign at 8.4x.";
+      response.supporting_data.metrics = { highest_roas: '8.4x', second_best: '6.2x', account_avg: '4.2x' };
+    } else if (query.toLowerCase().includes('subject line')) {
+      response.answer = "Here are 5 high-performing subject lines for your welcome series, optimized for B2B SaaS curiosity coefficients.";
+      response.supporting_data.sources = ['GPT-4 Content Engine', 'Engagement History'];
+      response.recommended_actions = [
+        "Welcome to the Architecture of Growth",
+        "Inside the $100M Marketing OS",
+        "Your first 30 days of transformation",
+        "Why standard agencies are failing (and you won't)",
+        "The Protocol has been updated: Welcome."
+      ];
+    } else if (query.toLowerCase().includes('pixel')) {
+       response.answer = "Your Meta Pixel is currently reporting a mismatch error for conversion events on the 'Checkout' page. This is likely due to a recent change in your GTM container.";
+       response.supporting_data.metrics = { firing_status: 'ERROR', match_quality: '42%', events_dropped: '1.2k' };
+       response.recommended_actions = ["Verify GTM triggers", "Check CAPI connection"];
+    }
+
+    res.json(response);
+  });
+
+  // --- EMAIL DISPATCH AGENT ENDPOINTS ---
+  
+  let emailApprovals: any[] = [
+    {
+      id: 'appr-101',
+      requester: 'phidephefem@gmail.com',
+      recipient_count: 14250,
+      subject: 'Global Spring reveal - Legacy List',
+      status: 'COMPLIANCE_CHECK',
+      priority: 'high',
+      risk_score: 0.82,
+      compliance_flags: ['High Volume Bounce Risk', 'Legacy List Detection'],
+      timestamp: new Date(Date.now() - 3600000).toISOString(),
+      body_preview: 'Secure communication regarding our spring reveal strategy...'
+    }
+  ];
+
+  let emailAuditTrail: any[] = [
+    { id: 'aud-1', event: 'VAULT_ACCESS', actor: 'phidephefem@gmail.com', ip_address: '192.168.1.45', details: 'Access to encrypted email logs', timestamp: new Date(Date.now() - 7200000).toISOString(), severity: 'low' },
+    { id: 'aud-2', event: 'DISPATCH_QUEUED', actor: 'SYSTEM', ip_address: 'INTERNAL', details: 'Financial communication appr-101 queued for MFA', timestamp: new Date(Date.now() - 3600000).toISOString(), severity: 'medium' },
+    { id: 'aud-3', event: 'CERT_ROTATION', actor: 'ADMIN', ip_address: '10.0.0.8', details: 'TLS 1.3 certificates rotated successfully', timestamp: new Date(Date.now() - 300000).toISOString(), severity: 'high' }
+  ];
+
+  app.post('/api/v1/email/dispatch', (req, res) => {
+    const { to, subject, encryption, compliance, body, type } = req.body;
+
+    if (!to || !subject) {
+      return res.status(400).json({ error: 'Recipient and subject required' });
+    }
+
+    console.log(`[Email Agent] Dispatching secure ${type} email to: ${to} via ${encryption}`);
+
+    // Rule: Large sends or specific types require manual approval
+    const sensitiveTypes = ['reporting', 'financial', 'legal'];
+    const needsApproval = to.length > 100 || !body?.includes('unsubscribe') || !body?.includes('address') || sensitiveTypes.includes(type);
+
+    if (needsApproval) {
+      const newApproval = {
+        id: `appr-${Date.now()}`,
+        requester: 'phidephefem@gmail.com',
+        recipient_count: to.length,
+        subject: subject,
+        status: sensitiveTypes.includes(type) ? 'LEGAL_REVIEW' : 'LEGAL_REVIEW',
+        priority: to.length > 500 || type === 'financial' ? 'critical' : 'medium',
+        risk_score: sensitiveTypes.includes(type) ? 0.95 : (to.length > 500 ? 0.9 : 0.5),
+        compliance_flags: sensitiveTypes.includes(type) ? [`Sensitive Type: ${type}`] : (!body?.includes('unsubscribe') ? ['Missing Opt-out'] : ['High Volume']),
+        timestamp: new Date().toISOString(),
+        body_preview: body ? body.substring(0, 100) + '...' : 'No preview'
+      };
+      emailApprovals.push(newApproval);
+      
+      emailAuditTrail.push({
+        id: `aud-${Date.now()}`,
+        event: 'DISPATCH_BLOCKED',
+        actor: 'phidephefem@gmail.com',
+        ip_address: req.ip || 'UNKNOWN',
+        details: `Dispatch of ${type} email blocked for manual approval (ID: ${newApproval.id})`,
+        timestamp: new Date().toISOString(),
+        severity: 'medium'
+      });
+
+      return res.json({
+        dispatch_id: newApproval.id,
+        status: 'queued',
+        message: `Email type '${type}' requires manual approval before dispatch.`,
+        security_audit_link: `https://a2a.agency/audit/${newApproval.id}`,
+        encryption_hash: Buffer.from(`${Date.now()}-pending`).toString('hex'),
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    emailAuditTrail.push({
+      id: `aud-${Date.now()}`,
+      event: 'DISPATCH_SUCCESS',
+      actor: 'phidephefem@gmail.com',
+      ip_address: req.ip || 'UNKNOWN',
+      details: `Dispatched ${type} email to ${to.length} recipients`,
+      timestamp: new Date().toISOString(),
+      severity: 'low'
+    });
+
+    res.json({
+      dispatch_id: `eml-${Date.now()}`,
+      status: 'dispatched',
+      security_audit_link: `https://a2a.agency/audit/eml-${Date.now()}`,
+      encryption_hash: Buffer.from(`${Date.now()}-secure`).toString('hex'),
+      timestamp: new Date().toISOString()
+    });
+  });
+
+  app.get('/api/v1/email/approvals', (req, res) => {
+    res.json({ approvals: emailApprovals });
+  });
+
+  app.get('/api/v1/email/audit', (req, res) => {
+    res.json({ audit: emailAuditTrail });
+  });
+
+  app.post('/api/v1/email/approvals/:id/action', (req, res) => {
+    const { id } = req.params;
+    const { action } = req.body; // 'approve' or 'reject'
+
+    const index = emailApprovals.findIndex(a => a.id === id);
+    if (index === -1) return res.status(404).json({ error: 'Approval not found' });
+
+    if (action === 'approve') {
+      emailApprovals[index].status = 'APPROVED';
+      emailAuditTrail.push({
+        id: `aud-${Date.now()}`,
+        event: 'APPROVAL_GRANTED',
+        actor: 'ADMIN',
+        ip_address: 'INTERNAL',
+        details: `Manual approval granted for dispatch ${id}`,
+        timestamp: new Date().toISOString(),
+        severity: 'medium'
+      });
+      res.json({ message: 'Email approved for dispatch.', status: 'APPROVED' });
+    } else {
+      emailApprovals[index].status = 'REVISION_REQUESTED';
+      emailAuditTrail.push({
+        id: `aud-${Date.now()}`,
+        event: 'APPROVAL_REJECTED',
+        actor: 'ADMIN',
+        ip_address: 'INTERNAL',
+        details: `Manual approval rejected for dispatch ${id}`,
+        timestamp: new Date().toISOString(),
+        severity: 'medium'
+      });
+      res.json({ message: 'Email rejected. Revision requested.', status: 'REVISION_REQUESTED' });
+    }
+  });
+
+  app.post('/api/v1/email/validate', (req, res) => {
+    const { body } = req.body;
+    
+    // Simulate natural language compliance check
+    const issues = [];
+    if (!body?.includes('unsubscribe')) issues.push('Missing unsubscribe link (CAN-SPAM risk)');
+    if (!body?.includes('address')) issues.push('Missing physical office address (CAN-SPAM required)');
+
+    res.json({
+      valid: issues.length === 0,
+      issues,
+      score: issues.length === 0 ? 1.0 : 0.6
+    });
+  });
+
+  app.get('/api/v1/email/dispatches', (req, res) => {
+    res.json({
+      dispatches: [
+        { id: 'eml-101', to: 'client@enterprise.com', subject: 'Quarterly Audit Report', type: 'reporting', status: 'delivered', security_level: 'TLS 1.3', timestamp: new Date(Date.now() - 86400000).toISOString(), open_count: 3, click_count: 1 },
+        { id: 'eml-102', to: 'leaks@competitor.net', subject: 'Strategic Roadmap', type: 'reporting', status: 'bounced', security_level: 'PGP', timestamp: new Date(Date.now() - 43200000).toISOString(), open_count: 0, click_count: 0 },
+        { id: 'eml-103', to: 'lead@target.com', subject: 'Introduction to Agency OS', type: 'marketing', status: 'processing', security_level: 'TLS 1.3', timestamp: new Date().toISOString(), open_count: 0, click_count: 0 }
+      ]
+    });
+  });
+
+  app.get('/api/v1/email/metrics', (req, res) => {
+    res.json({
+      total_sent: 15420,
+      delivered: 15200,
+      bounced: 180,
+      opens: 8450,
+      clicks: 3120,
+      spam_reports: 5,
+      delivery_rate: 98.6,
+      open_rate: 54.8,
+      click_rate: 20.2,
+      timeline: Array.from({ length: 7 }, (_, i) => ({
+        timestamp: new Date(Date.now() - (6 - i) * 86400000).toISOString().split('T')[0],
+        sent: Math.floor(2000 + Math.random() * 500),
+        delivered: Math.floor(1900 + Math.random() * 500)
+      }))
+    });
+  });
+
+  // --- BILLING & CHECKOUT ENDPOINTS ---
+
+  app.post('/api/v1/checkout/create-session', (req, res) => {
+    const { plan, price } = req.body;
+    
+    if (!plan || !price) {
+      return res.status(400).json({ error: 'Missing plan or price' });
+    }
+
+    console.log(`[Billing] Creating checkout session for plan: ${plan}, price: ${price}`);
+
+    res.json({
+      sessionId: `sess_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+      url: `https://checkout.stripe.com/pay/${plan}?price=${price.replace('$', '')}`
+    });
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({

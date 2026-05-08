@@ -541,7 +541,88 @@ export interface PPCManagerResponse {
 }
 
 export type Pillar = 'online' | 'social' | 'seo' | 'ppc';
-export type Tab = 'overview' | 'online' | 'social' | 'seo' | 'ppc' | 'approvals' | 'clients' | 'protocol' | 'media' | 'personas' | 'collaboration' | 'settings' | 'vibe-library' | 'agency-config';
+export type Tab = 'overview' | 'online' | 'social' | 'seo' | 'ppc' | 'approvals' | 'clients' | 'protocol' | 'media' | 'personas' | 'collaboration' | 'settings' | 'vibe-library' | 'agency-config' | 'pricing' | 'query-agent' | 'email-dispatch' | 'email-approvals' | 'email-tracking' | 'email-audit';
+
+export type EmailType = 'transactional' | 'marketing' | 'reporting' | 'financial' | 'legal';
+
+export interface ComplianceShield {
+  gdpr: boolean;
+  ccpa: boolean;
+  can_spam: boolean;
+  hipaa?: boolean;
+}
+
+export interface SecureSendRequest {
+  to: string[];
+  subject: string;
+  body: string;
+  type: EmailType;
+  template_id?: string;
+  encryption: 'TLS 1.3' | 'S/MIME' | 'PGP';
+  compliance: ComplianceShield;
+  mfa_token?: string;
+}
+
+export interface SecureSendResponse {
+  dispatch_id: string;
+  status: 'dispatched' | 'queued' | 'blocked';
+  message?: string;
+  security_audit_link: string;
+  encryption_hash: string;
+  timestamp: string;
+}
+
+export interface EmailDispatchLog {
+  id: string;
+  to: string;
+  subject: string;
+  type: EmailType;
+  status: 'sent' | 'failed' | 'processing' | 'delivered' | 'bounced';
+  security_level: string;
+  timestamp: string;
+  open_count?: number;
+  click_count?: number;
+}
+
+export interface AuditEntry {
+  id: string;
+  event: string;
+  actor: string;
+  ip_address: string;
+  details: string;
+  timestamp: string;
+  severity: 'low' | 'medium' | 'high';
+}
+
+export interface EmailDeliveryMetrics {
+  total_sent: number;
+  delivered: number;
+  bounced: number;
+  opens: number;
+  clicks: number;
+  spam_reports: number;
+  delivery_rate: number;
+  open_rate: number;
+  click_rate: number;
+  timeline: {
+    timestamp: string;
+    sent: number;
+    delivered: number;
+  }[];
+}
+
+export interface EmailApproval {
+  id: string;
+  requester: string;
+  recipient_count: number;
+  subject: string;
+  status: ApprovalStatus;
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  risk_score: number;
+  compliance_flags: string[];
+  timestamp: string;
+  body_preview: string;
+}
 
 export interface Persona {
   id: string;
@@ -1314,4 +1395,56 @@ export interface SEOMetric {
   rank: number;
   change: number;
   volume: string;
+}
+
+export interface PricingPlan {
+  plan: string;
+  price: string;
+  logicGate: string;
+  action: string;
+  features?: string[];
+  isPopular?: boolean;
+}
+
+export interface CheckoutSessionRequest {
+  plan: string;
+  price: string;
+}
+
+export interface CheckoutSessionResponse {
+  sessionId: string;
+  url: string;
+}
+
+export interface QueryRequest {
+  query: string;
+  context?: {
+    tenant_id: string;
+    recent_events?: string[];
+    pillar?: string;
+  };
+}
+
+export interface QueryResponse {
+  answer: string;
+  supporting_data: {
+    metrics: Record<string, any>;
+    charts: {
+      type: 'bar' | 'line' | 'pie';
+      data: any[];
+      title: string;
+    }[];
+    sources: string[];
+  };
+  confidence_score: number;
+  recommended_actions: string[];
+  related_questions: string[];
+}
+
+export interface QueryLogEntry {
+  id: string;
+  timestamp: string;
+  query: string;
+  response: QueryResponse;
+  type: 'operational' | 'strategic' | 'technical' | 'creative';
 }

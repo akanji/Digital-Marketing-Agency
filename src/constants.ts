@@ -31,6 +31,7 @@ import {
   TrainingJob,
   AgencyTemplate,
   SubscriptionTier,
+  PricingPlan,
   TenantBranding,
   PPCManagerResponse
 } from './types';
@@ -102,6 +103,31 @@ export const SUBSCRIPTION_TIERS: SubscriptionTier[] = [
     price: '$999/mo',
     features: ['Unlimited Users', 'SLA Guarantees', 'Dedicated Infrastructure'],
     limits: { users: 1000, clients: 1000 }
+  }
+];
+
+export const PRICING_PLANS: PricingPlan[] = [
+  {
+    plan: 'Trial',
+    price: '$0.00',
+    logicGate: '7-Day Access',
+    action: 'POST /api/v1/checkout/create-session?price=trial',
+    features: ['Standard CRM Sync', 'Reputation Monitoring', 'Self-Healing Protocol (L1)']
+  },
+  {
+    plan: 'Monthly',
+    price: '$19.99',
+    logicGate: 'Recurring',
+    action: 'POST /api/v1/checkout/create-session?price=monthly',
+    features: ['All Trial Features', 'Advanced Deliverability', 'Gemini 2.0 Auto-Fix (L2)', 'Custom Webhooks'],
+    isPopular: true
+  },
+  {
+    plan: 'Yearly',
+    price: '$199.99',
+    logicGate: 'Recurring (Save 16%)',
+    action: 'POST /api/v1/checkout/create-session?price=yearly',
+    features: ['All Pro Features', 'Dedicated Shard Management', 'White-Label Dashboards', 'Priority Support']
   }
 ];
 

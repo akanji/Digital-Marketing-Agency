@@ -108,7 +108,11 @@ import {
   Edit3,
   Trash2,
   BarChart2,
-  TestTube2
+  TestTube2,
+  ClipboardList,
+  Crown,
+  Split,
+  LineChart
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -120,6 +124,7 @@ import {
   Tooltip, 
   ResponsiveContainer,
   BarChart,
+  Bar,
   PieChart,
   Pie,
   Cell
@@ -127,6 +132,9 @@ import {
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { 
+  PricingPlan,
+  QueryResponse,
+  QueryLogEntry,
   Tab, Campaign, Client, AgentCard, SystemLog, ValidationCycle, Pillar, ApprovalStatus, Persona, AgencyTemplate, MediaAsset, ContentCampaign, ActiveCampaign, VocalIdentity, MediaCenterAsset, SEOCrawlReport, Deliverable, EmailSegment, AutomationWorkflow, AutomationFlowDetail, ActiveFlowsResponse, EmailTemplate, EmailTemplateDetail, TemplatesResponse, EmailVariant, PPCManagerResponse, MCCManager, LinkedClient, AttributionModel, AttributionModelsResponse, ActiveShardsResponse, PacingDetailsResponse, OptimizationApprovalResponse, BidSimulationResponse, BidSimulationHistoryResponse, SmartBiddingStatusResponse, SmartBiddingAdjustmentResponse, PPCLogsResponse, PPCLog, PPCQuickActionRequest, PPCQuickActionResponse, PPCStreamEvent, PPCPlanStatusResponse, A2ASystemStatusResponse, CloudStatusResponse, OptimizationProposal,
   AudienceSegmentsResponse, AudienceSegmentDetail, CreateAudienceSegmentRequest, CreateAudienceSegmentResponse,
   SegmentHealthResponse, SegmentHealthRecommendation, ReputationMonitorResponse,
@@ -142,7 +150,17 @@ import {
   OnlineOpsLog, OnlineOpsLogsResponse,
   OnlineOpsQuickActionRequest, OnlineOpsQuickActionResponse,
   OAuthStatusResponse, MaintenanceAgentLog, MaintenanceAuditResponse,
-  DeveloperAgentLog, DeveloperFixResponse
+  DeveloperAgentLog, DeveloperFixResponse,
+  CheckoutSessionRequest,
+  CheckoutSessionResponse,
+  SecureSendRequest,
+  SecureSendResponse,
+  EmailType,
+  EmailDispatchLog,
+  EmailApproval,
+  AuditEntry,
+  EmailDeliveryMetrics,
+  ComplianceShield
 } from './types';
 import { GoogleGenAI, Type, Modality, ThinkingLevel } from "@google/genai";
 import { 
@@ -177,6 +195,7 @@ import {
   TRAINING_JOBS,
   AGENCY_TEMPLATES,
   SUBSCRIPTION_TIERS,
+  PRICING_PLANS,
   DEFAULT_BRANDING,
   PPC_MANAGER_DATA
 } from './constants';
@@ -508,6 +527,971 @@ const Overview = ({ onAction }: { onAction: (name: string, type?: string) => voi
     </div>
   </div>
 );
+
+const PricingView = ({ onAction }: { onAction: (name: string, type?: string) => void }) => {
+  const [isCreatingSession, setIsCreatingSession] = useState<string | null>(null);
+
+  const handleCreateCheckoutSession = async (plan: PricingPlan) => {
+    setIsCreatingSession(plan.plan);
+    onAction(`Initializing secure checkout protocol for ${plan.plan} tier...`, 'info');
+
+    const requestBody: CheckoutSessionRequest = {
+      plan: plan.plan,
+      price: plan.price
+    };
+
+    try {
+      const response = await fetch('/api/v1/checkout/create-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) throw new Error('Checkout Handshake Failed');
+      const result: CheckoutSessionResponse = await response.json();
+      
+      onAction(`Checkout session created. Redirecting to payment portal...`, 'success');
+      
+      // Simulate redirection
+      setTimeout(() => {
+        window.open(result.url, '_blank');
+      }, 1000);
+    } catch (error) {
+      console.error(error);
+      onAction('Billing orchestration module failed to create session.', 'error');
+    } finally {
+      setIsCreatingSession(null);
+    }
+  };
+
+  return (
+    <div className="space-y-12 animate-in slide-in-from-right-4 duration-500">
+      <div className="text-center max-w-2xl mx-auto space-y-4">
+        <h2 className="text-4xl font-black font-display uppercase tracking-tighter text-agency-ink">Scale Your Agency Presence</h2>
+        <p className="text-agency-muted font-bold uppercase tracking-widest text-xs">Unleash the full power of Gemini 2.0 Agentic Workflows & Multi-Tenant Orchestration</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 px-4">
+        {PRICING_PLANS.map((plan) => (
+          <div 
+            key={plan.plan} 
+            className={cn(
+              "relative p-8 rounded-[2.5rem] border-2 transition-all flex flex-col group",
+              plan.isPopular 
+                ? "bg-agency-ink text-white border-agency-accent shadow-2xl scale-105" 
+                : "bg-white border-agency-border hover:border-agency-accent/50 text-agency-ink"
+            )}
+          >
+            {plan.isPopular && (
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-agency-accent text-white text-[10px] font-black uppercase tracking-widest rounded-full shadow-lg">
+                Most Optimized
+              </div>
+            )}
+
+            <div className="mb-8">
+              <div className={cn("text-[10px] font-black uppercase tracking-[0.2em] mb-2", plan.isPopular ? "text-agency-accent" : "text-agency-muted")}>
+                {plan.plan} Tier
+              </div>
+              <div className="flex items-baseline gap-1">
+                <span className="text-4xl font-black font-display tracking-tighter">{plan.price}</span>
+                <span className={cn("text-[10px] font-bold uppercase", plan.isPopular ? "text-white/40" : "text-agency-muted")}>
+                  {plan.plan === 'Yearly' ? '/year' : plan.plan === 'Trial' ? '/7d' : '/mo'}
+                </span>
+              </div>
+              <div className={cn("mt-2 text-[11px] font-bold italic", plan.isPopular ? "text-slate-400" : "text-agency-muted")}>
+                {plan.logicGate}
+              </div>
+            </div>
+
+            <div className={cn("flex-1 space-y-4 mb-8 pt-8 border-t", plan.isPopular ? "border-white/10" : "border-agency-border")}>
+              {plan.features.map((feature, idx) => (
+                <div key={idx} className="flex items-start gap-3">
+                  <div className={cn("mt-0.5 p-0.5 rounded-full", plan.isPopular ? "bg-agency-accent text-white" : "bg-agency-bg text-agency-accent")}>
+                    <Check className="w-3 h-3" />
+                  </div>
+                  <span className="text-[11px] font-bold leading-tight">{feature}</span>
+                </div>
+              ))}
+            </div>
+
+            <button 
+              onClick={() => handleCreateCheckoutSession(plan)}
+              disabled={isCreatingSession !== null}
+              className={cn(
+                "w-full py-4 rounded-2xl text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2",
+                plan.isPopular 
+                  ? "bg-agency-accent text-white shadow-xl shadow-agency-accent/20 hover:scale-105 active:scale-95" 
+                  : "bg-agency-ink text-white hover:bg-agency-accent"
+              )}
+            >
+              {isCreatingSession === plan.plan ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  Orchestrating...
+                </>
+              ) : (
+                <>
+                  {plan.plan === 'Trial' ? <Clock className="w-4 h-4" /> : <Zap className="w-4 h-4" />}
+                  {plan.plan === 'Trial' ? 'Start Free Sequence' : 'Acquire License'}
+                </>
+              )}
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <div className="max-w-4xl mx-auto p-12 bg-agency-bg border border-agency-border rounded-[3rem] text-center space-y-6">
+        <div className="flex justify-center -space-x-3">
+          {[1, 2, 3, 4, 5].map(i => (
+            <div key={i} className="w-10 h-10 rounded-full border-2 border-white bg-slate-200 overflow-hidden">
+               <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=agent${i}`} alt="Agent" />
+            </div>
+          ))}
+        </div>
+        <p className="text-agency-ink font-bold font-display uppercase tracking-tight text-xl">Trusted by 450+ High-Performance Digital Agencies</p>
+        <div className="flex flex-wrap justify-center gap-8 opacity-40 grayscale group hover:grayscale-0 transition-all duration-700">
+           {['Stripe', 'Twilio', 'Meta', 'Google Ads', 'Shopify'].map(l => (
+             <span key={l} className="text-sm font-black uppercase tracking-widest">{l}</span>
+           ))}
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-8 border-t border-agency-border">
+           <div className="space-y-2">
+              <Shield className="w-6 h-6 text-agency-accent mx-auto" />
+              <div className="text-[10px] font-black uppercase text-agency-ink">Bank-Grade Isolation</div>
+              <div className="text-[9px] font-medium text-agency-muted">Each tenant is deployed to a strictly isolated sharded compute node.</div>
+           </div>
+           <div className="space-y-2">
+              <Cpu className="w-6 h-6 text-agency-accent mx-auto" />
+              <div className="text-[10px] font-black uppercase text-agency-ink">Agentic Auto-Scale</div>
+              <div className="text-[9px] font-medium text-agency-muted">LLM-driven resource allocation adjusts to campaign bursts in real-time.</div>
+           </div>
+           <div className="space-y-2">
+              <History className="w-6 h-6 text-agency-accent mx-auto" />
+              <div className="text-[10px] font-black uppercase text-agency-ink">Immortal Audit Logs</div>
+              <div className="text-[9px] font-medium text-agency-muted">Every agent interaction is persisted to a tamper-proof blockchain-inspired ledger.</div>
+           </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const EmailDispatchView = ({ onAction }: { onAction: (name: string, type?: string) => void }) => {
+  const [formData, setFormData] = useState<SecureSendRequest>({
+    to: [''],
+    subject: '',
+    body: '',
+    type: 'transactional',
+    encryption: 'TLS 1.3',
+    compliance: { gdpr: true, ccpa: true, can_spam: true }
+  });
+  const [isSending, setIsSending] = useState(false);
+  const [validationStatus, setValidationStatus] = useState<{valid: boolean, issues: string[]} | null>(null);
+
+  const handleValidate = async () => {
+    onAction('Running Compliance Shield scan...', 'info');
+    try {
+      const response = await fetch('/api/v1/email/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body: formData.body })
+      });
+      const data = await response.json();
+      setValidationStatus({ valid: data.valid, issues: data.issues });
+      if (data.valid) onAction('Compliance validation passed.', 'success');
+      else onAction('Compliance issues detected.', 'warn');
+    } catch (error) {
+      onAction('Validation engine unreachable.', 'error');
+    }
+  };
+
+  const handleSend = async () => {
+    setIsSending(true);
+    onAction('Initializing secure dispatch sequence...', 'info');
+    try {
+      const response = await fetch('/api/v1/email/dispatch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+      const data: SecureSendResponse = await response.json();
+      if (data.status === 'queued') {
+        onAction(data.message || 'Security protocol triggered manual review.', 'warning');
+      } else {
+        onAction(`Email dispatched securely. Audit ID: ${data.dispatch_id}`, 'success');
+      }
+      setFormData({ to: [''], subject: '', body: '', type: 'transactional', encryption: 'TLS 1.3', compliance: { gdpr: true, ccpa: true, can_spam: true } });
+      setValidationStatus(null);
+    } catch (error) {
+      onAction('Dispatch sequence interrupted.', 'error');
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in zoom-in-95 duration-500">
+      <div className="flex items-center justify-between p-6 bg-agency-bg border border-agency-border rounded-[2rem]">
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-emerald-500/10 rounded-2xl">
+            <Lock className="w-6 h-6 text-emerald-500" />
+          </div>
+          <div>
+            <h2 className="text-xl font-black font-display uppercase tracking-tight">Secure Email Dispatch</h2>
+            <p className="text-[10px] font-bold text-agency-muted uppercase tracking-[0.2em]">Enterprise-Grade Encryption & Compliance Layer</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500/5 rounded-xl border border-emerald-500/10">
+          <ShieldAlert className="w-4 h-4 text-emerald-500" />
+          <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">Protocol: ACTIVE</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 text-left">
+        <div className="lg:col-span-2 space-y-6">
+          <div className="panel-card p-8 space-y-6">
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-black uppercase text-agency-muted tracking-widest block mb-2">Email Type</label>
+                  <select 
+                    value={formData.type}
+                    onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value as EmailType }))}
+                    className="w-full bg-agency-bg border-agency-border rounded-xl p-3 text-xs font-bold focus:ring-agency-accent"
+                  >
+                    <option value="transactional">Transactional</option>
+                    <option value="marketing">Marketing</option>
+                    <option value="reporting">Client Reporting (SENSITIVE)</option>
+                    <option value="financial">Financial (MFA REQ)</option>
+                    <option value="legal">Legal (LEGAL REVIEW)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase text-agency-muted tracking-widest block mb-2">Recipients</label>
+                  <input 
+                    type="text" 
+                    value={formData.to.join(',')}
+                    onChange={(e) => setFormData(prev => ({ ...prev, to: e.target.value.split(',') }))}
+                    className="w-full bg-agency-bg border-agency-border rounded-xl p-3 text-xs font-bold focus:ring-agency-accent"
+                    placeholder="enter emails..."
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase text-agency-muted tracking-widest block mb-2">Secure Subject</label>
+                <input 
+                  type="text" 
+                  value={formData.subject}
+                  onChange={(e) => setFormData(prev => ({ ...prev, subject: e.target.value }))}
+                  className="w-full bg-agency-bg border-agency-border rounded-xl p-3 text-xs font-bold focus:ring-agency-accent"
+                  placeholder="Confidential communication..."
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase text-agency-muted tracking-widest block mb-2">Message Body</label>
+                <textarea 
+                  rows={8}
+                  value={formData.body}
+                  onChange={(e) => setFormData(prev => ({ ...prev, body: e.target.value }))}
+                  className="w-full bg-agency-bg border-agency-border rounded-xl p-3 text-xs font-bold focus:ring-agency-accent min-h-[200px]"
+                  placeholder="Compose your secure message..."
+                />
+              </div>
+            </div>
+
+            <div className="pt-6 border-t border-agency-border flex justify-between items-center">
+              <button 
+                onClick={handleValidate}
+                className="px-6 py-3 bg-agency-bg border border-agency-border rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center gap-2"
+              >
+                <ShieldCheck className="w-4 h-4 text-agency-accent" />
+                Validate Compliance
+              </button>
+              <button 
+                onClick={handleSend}
+                disabled={isSending || (validationStatus && !validationStatus?.valid)}
+                className="px-8 py-3 bg-agency-ink text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-agency-accent transition-all flex items-center gap-2 shadow-xl shadow-agency-ink/10 disabled:opacity-50"
+              >
+                {isSending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                Execute Secure Dispatch
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="panel-card p-6 bg-slate-50">
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-agency-muted mb-4">Security Parameters</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="text-[9px] font-black uppercase text-agency-muted tracking-tighter block mb-2">Encryption Standard</label>
+                <select 
+                  value={formData.encryption}
+                  onChange={(e) => setFormData(prev => ({ ...prev, encryption: e.target.value as any }))}
+                  className="w-full bg-white border-agency-border rounded-lg p-2 text-[10px] font-bold"
+                >
+                  <option>TLS 1.3</option>
+                  <option>S/MIME</option>
+                  <option>PGP</option>
+                </select>
+              </div>
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-agency-ink">GDPR Compliant</span>
+                  <input type="checkbox" checked={formData.compliance.gdpr} readOnly className="rounded text-agency-accent" />
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-agency-ink">CCPA Safe</span>
+                  <input type="checkbox" checked={formData.compliance.ccpa} readOnly className="rounded text-agency-accent" />
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-agency-ink">CAN-SPAM Verified</span>
+                  <input type="checkbox" checked={formData.compliance.can_spam} readOnly className="rounded text-agency-accent" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {validationStatus && (
+            <div className={cn(
+              "panel-card p-6 border-l-4",
+              validationStatus.valid ? "border-l-emerald-500 bg-emerald-50" : "border-l-amber-500 bg-amber-50"
+            )}>
+              <h3 className={cn(
+                "text-[10px] font-black uppercase tracking-widest mb-3",
+                validationStatus.valid ? "text-emerald-700" : "text-amber-700"
+              )}>
+                {validationStatus.valid ? 'Compliance Verified' : 'Compliance Warning'}
+              </h3>
+              {validationStatus.valid ? (
+                <p className="text-[11px] font-bold text-emerald-800">No issues detected. Message is safe for dispatch.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {validationStatus.issues.map((issue, idx) => (
+                    <li key={idx} className="flex items-start gap-2">
+                      <div className="mt-1 w-1.5 h-1.5 rounded-full bg-amber-500" />
+                      <span className="text-[10px] font-bold text-amber-900">{issue}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
+          <div className="panel-card p-6">
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-agency-muted mb-4">Encryption Logic</h3>
+            <div className="p-4 bg-agency-ink rounded-xl font-mono text-[9px] text-agency-accent space-y-1">
+              <div className="text-white/40"># Header Analysis</div>
+              <div>X-Security-Agent-Version: 2.4.0</div>
+              <div>X-Encryption-Standard: {formData.encryption}</div>
+              <div>X-Compliance-Hash: AES-256-GCM</div>
+              <div className="pt-2 text-white/40"># Entropy Sequence</div>
+              <div className="break-all">{Buffer.from(`${formData.subject}-${Date.now()}`).toString('hex').substring(0, 48)}...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const EmailAuditView = ({ onAction }: { onAction: (name: string, type?: string) => void }) => {
+  const [audit, setAudit] = useState<AuditEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchAudit = async () => {
+      try {
+        const response = await fetch('/api/v1/email/audit');
+        const data = await response.json();
+        if (data.audit) setAudit(data.audit);
+      } catch (error) {
+        onAction('Audit trail sequence unreachable.', 'error');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchAudit();
+  }, []);
+
+  if (isLoading) return <div className="flex justify-center p-12"><RefreshCw className="w-8 h-8 animate-spin text-agency-accent" /></div>;
+
+  return (
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="flex items-center justify-between p-6 bg-agency-ink text-white rounded-[2rem] border border-white/5 shadow-2xl relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-agency-accent/5 to-transparent pointer-events-none" />
+        <div className="flex items-center gap-4 relative z-10">
+          <div className="p-3 bg-white/5 rounded-2xl border border-white/10 backdrop-blur-sm">
+            <ClipboardList className="w-6 h-6 text-agency-accent" />
+          </div>
+          <div>
+            <h2 className="text-xl font-black font-display uppercase tracking-tight">Immutable Audit Trail</h2>
+            <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mt-1">Platform-Wide Security & Dispatch Integrity Log</p>
+          </div>
+        </div>
+        <div className="px-4 py-2 bg-white/5 rounded-xl border border-white/10 text-right relative z-10">
+          <div className="text-[9px] font-black uppercase text-agency-accent">Chain Integrity</div>
+          <div className="text-sm font-black font-mono">VERIFIED</div>
+        </div>
+      </div>
+
+      <div className="panel-card p-0 overflow-hidden border-agency-border">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-agency-bg border-b border-agency-border">
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-agency-muted">Timestamp</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-agency-muted">Event</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-agency-muted">Actor</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-agency-muted">IP Address</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-agency-muted">Details</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-agency-muted">Severity</th>
+            </tr>
+          </thead>
+          <tbody>
+            {audit.map((entry) => (
+              <tr key={entry.id} className="border-b border-agency-border/50 hover:bg-agency-bg/30 transition-colors group">
+                <td className="px-6 py-4">
+                  <div className="text-[10px] font-mono text-agency-muted">{new Date(entry.timestamp).toLocaleString()}</div>
+                </td>
+                <td className="px-6 py-4">
+                  <span className="text-[10px] font-black font-display text-agency-ink uppercase tracking-tight">{entry.event}</span>
+                </td>
+                <td className="px-6 py-4">
+                  <div className="text-[10px] font-bold text-agency-ink">{entry.actor}</div>
+                </td>
+                <td className="px-6 py-4">
+                   <div className="text-[10px] font-mono text-agency-muted">{entry.ip_address}</div>
+                </td>
+                <td className="px-6 py-4">
+                  <div className="text-[11px] font-bold text-agency-ink line-clamp-1 group-hover:line-clamp-none transition-all">{entry.details}</div>
+                </td>
+                <td className="px-6 py-4">
+                  <span className={cn(
+                    "px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest border",
+                    entry.severity === 'high' ? "bg-red-50 text-red-600 border-red-100" :
+                    entry.severity === 'medium' ? "bg-amber-50 text-amber-600 border-amber-100" :
+                    "bg-emerald-50 text-emerald-600 border-emerald-100"
+                  )}>
+                    {entry.severity}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+         <div className="panel-card p-6 bg-slate-900 text-white">
+            <div className="flex items-center gap-3 mb-4">
+               <ShieldCheck className="w-5 h-5 text-agency-accent" />
+               <span className="text-[10px] font-black uppercase tracking-widest">Hash Verification</span>
+            </div>
+            <p className="text-[11px] font-bold text-white/60 mb-4 font-mono break-all">sha256-k0yR8...zL0P9Qx</p>
+            <div className="pt-4 border-t border-white/10 flex justify-between items-center">
+               <span className="text-[9px] font-black uppercase text-white/40">Status</span>
+               <span className="text-[9px] font-black uppercase text-emerald-400">UNALTERED</span>
+            </div>
+         </div>
+      </div>
+    </div>
+  );
+};
+
+const EmailTrackingView = ({ onAction }: { onAction: (name: string, type?: string) => void }) => {
+  const [metrics, setMetrics] = useState<EmailDeliveryMetrics | null>(null);
+  const [dispatches, setDispatches] = useState<EmailDispatchLog[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [mRes, dRes] = await Promise.all([
+          fetch('/api/v1/email/metrics'),
+          fetch('/api/v1/email/dispatches')
+        ]);
+        const mData = await mRes.json();
+        const dData = await dRes.json();
+        setMetrics(mData);
+        setDispatches(dData.dispatches);
+      } catch (error) {
+        onAction('Failed to fetch tracking data.', 'error');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  if (isLoading || !metrics) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <RefreshCw className="w-8 h-8 animate-spin text-agency-accent" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="flex items-center justify-between p-6 bg-white border border-agency-border rounded-[2rem]">
+        <div>
+          <h2 className="text-xl font-black font-display uppercase tracking-tight">Delivery Intelligence</h2>
+          <p className="text-[10px] font-bold text-agency-muted uppercase tracking-widest mt-1">Real-Time Dispatch Tracking & Latency Attribution</p>
+        </div>
+        <div className="flex gap-4">
+          <div className="text-right">
+            <div className="text-[10px] font-black uppercase text-emerald-500 tracking-tighter">System Health</div>
+            <div className="text-xl font-black text-agency-ink">OPTIMAL</div>
+          </div>
+          <div className="p-3 bg-agency-bg rounded-2xl">
+            <Activity className="w-5 h-5 text-agency-accent" />
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="panel-card p-6">
+          <div className="text-[10px] font-black uppercase text-agency-muted mb-2">Total Dispatched</div>
+          <div className="text-2xl font-black text-agency-ink">{metrics.total_sent.toLocaleString()}</div>
+          <div className="mt-2 text-[10px] font-bold text-emerald-600 flex items-center gap-1">
+             <ArrowUpRight className="w-3 h-3" /> 8.4% vs last period
+          </div>
+        </div>
+        <div className="panel-card p-6">
+          <div className="text-[10px] font-black uppercase text-agency-muted mb-2">Delivery Rate</div>
+          <div className="text-2xl font-black text-agency-ink">{metrics.delivery_rate}%</div>
+          <div className="mt-2 text-[10px] font-bold text-emerald-600">Enterprise Standard: 98%</div>
+        </div>
+        <div className="panel-card p-6">
+          <div className="text-[10px] font-black uppercase text-agency-muted mb-2">Omni-Channel Opens</div>
+          <div className="text-2xl font-black text-agency-ink">{metrics.open_rate}%</div>
+          <div className="mt-2 text-[10px] font-bold text-agency-accent">Impact: +12% Efficiency</div>
+        </div>
+        <div className="panel-card p-6">
+          <div className="text-[10px] font-black uppercase text-agency-muted mb-2">Engagement CTR</div>
+          <div className="text-2xl font-black text-agency-ink">{metrics.click_rate}%</div>
+          <div className="mt-2 text-[10px] font-bold text-agency-muted italic">Tracking active via 256-bit GCM</div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 panel-card p-8">
+          <h3 className="text-sm font-black uppercase tracking-widest text-agency-ink mb-8">Propagation Timeline</h3>
+          <div className="h-[250px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={metrics.timeline}>
+                <defs>
+                  <linearGradient id="colorDelivery" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10B981" stopOpacity={0.1}/>
+                    <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="timestamp" axisLine={false} tickLine={false} tick={{fontSize: 9, fill: '#94a3b8'}} />
+                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 9, fill: '#94a3b8'}} />
+                <Tooltip />
+                <Area type="monotone" dataKey="sent" stroke="#2563EB" strokeWidth={2} fill="transparent" />
+                <Area type="monotone" dataKey="delivered" stroke="#10B981" strokeWidth={2} fillOpacity={1} fill="url(#colorDelivery)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="panel-card p-6">
+          <h3 className="text-sm font-black uppercase tracking-widest text-agency-ink mb-6">Security Breakdown</h3>
+          <div className="space-y-6">
+             <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-agency-muted">TLS 1.3 Encryption</span>
+                <span className="text-xs font-black">92%</span>
+             </div>
+             <div className="h-1 bg-agency-bg rounded-full overflow-hidden">
+                <div className="h-full bg-agency-accent w-[92%]" />
+             </div>
+             <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-agency-muted">Human Approval Wait</span>
+                <span className="text-xs font-black">4.2m</span>
+             </div>
+             <div className="h-1 bg-agency-bg rounded-full overflow-hidden">
+                <div className="h-full bg-amber-500 w-[65%]" />
+             </div>
+             <div className="p-4 bg-slate-900 border border-white/5 rounded-2xl flex items-center gap-4 mt-8">
+                <ShieldCheck className="w-8 h-8 text-emerald-500" />
+                <div>
+                   <div className="text-[10px] font-black uppercase text-white/40 tracking-widest leading-none mb-1">Vault Status</div>
+                   <div className="text-xs font-black text-white">SECURE & ROTATED</div>
+                </div>
+             </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <h3 className="text-[10px] font-black uppercase tracking-widest text-agency-muted px-4 font-display">Live Tracking Feed</h3>
+        <div className="grid grid-cols-1 gap-4">
+          {dispatches.map((disp) => (
+            <div key={disp.id} className="panel-card p-4 hover:border-agency-accent transition-all group cursor-pointer">
+              <div className="flex items-center gap-6">
+                 <div className={cn(
+                   "p-2 rounded-lg",
+                   disp.status === 'delivered' ? "bg-emerald-50 text-emerald-500" :
+                   disp.status === 'bounced' ? "bg-red-50 text-red-500" : "bg-blue-50 text-blue-500"
+                 )}>
+                   {disp.status === 'delivered' ? <CheckCircle2 className="w-5 h-5" /> : 
+                    disp.status === 'bounced' ? <XCircle className="w-5 h-5" /> : <RefreshCw className="w-5 h-5 animate-spin" />}
+                 </div>
+                 <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-black text-agency-ink truncate">{disp.subject}</span>
+                      <span className="text-[9px] font-mono text-agency-muted bg-agency-bg px-1 rounded uppercase">{disp.type}</span>
+                      <span className="text-[9px] font-mono text-agency-muted bg-agency-bg px-1 rounded">{disp.security_level}</span>
+                    </div>
+                    <div className="flex items-center gap-4 text-[10px] font-bold text-agency-muted">
+                       <span>To: {disp.to}</span>
+                       <div className="w-1 h-1 rounded-full bg-agency-border" />
+                       <span>{new Date(disp.timestamp).toLocaleString()}</span>
+                    </div>
+                 </div>
+                 <div className="flex items-center gap-6 text-right hidden sm:flex">
+                    <div>
+                       <div className="text-[9px] font-black uppercase text-agency-muted">Opens</div>
+                       <div className="text-sm font-black text-agency-ink">{disp.open_count || 0}</div>
+                    </div>
+                    <div>
+                       <div className="text-[9px] font-black uppercase text-agency-muted">Clicks</div>
+                       <div className="text-sm font-black text-agency-ink">{disp.click_count || 0}</div>
+                    </div>
+                 </div>
+                 <div className="p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <ArrowRight className="w-4 h-4 text-agency-accent" />
+                 </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const EmailApprovalView = ({ 
+  approvals, 
+  onAction, 
+  onHandle 
+}: { 
+  approvals: EmailApproval[], 
+  onAction: (name: string, type?: string) => void,
+  onHandle: (id: string, action: 'approve' | 'reject') => void
+}) => {
+  return (
+    <div className="space-y-8 animate-in slide-in-from-right-4 duration-500">
+      <div className="flex justify-between items-center bg-white p-6 border border-agency-border rounded-[2rem]">
+        <div>
+          <h2 className="text-xl font-black font-display uppercase tracking-tight">Email Security Approvals</h2>
+          <p className="text-[10px] font-bold text-agency-muted uppercase tracking-widest mt-1">Pending Human-in-the-Loop Decisions</p>
+        </div>
+        <div className="flex gap-2">
+          <div className="px-4 py-2 bg-agency-bg rounded-xl border border-agency-border">
+            <span className="text-[10px] font-black uppercase text-agency-muted">Pending: {approvals.filter(a => a.status !== 'APPROVED' && a.status !== 'REVISION_REQUESTED').length}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6">
+        {approvals.length === 0 ? (
+          <div className="panel-card p-12 text-center text-agency-muted">
+            <ShieldCheck className="w-12 h-12 mx-auto mb-4 opacity-20" />
+            <p className="font-bold uppercase tracking-widest text-xs">All email dispatch sequences are currently green-lit.</p>
+          </div>
+        ) : (
+          approvals.map((appr) => (
+            <div key={appr.id} className="panel-card overflow-hidden group">
+              <div className="p-8 flex flex-col lg:flex-row gap-8">
+                <div className="flex-1 space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className={cn(
+                      "px-2 py-1 rounded text-[9px] font-black uppercase tracking-widest",
+                      appr.priority === 'critical' ? "bg-red-500 text-white" : 
+                      appr.priority === 'high' ? "bg-amber-500 text-white" : "bg-agency-bg text-agency-muted"
+                    )}>
+                      {appr.priority} Priority
+                    </div>
+                    <span className="text-[10px] font-mono text-agency-muted">{appr.id}</span>
+                  </div>
+                  
+                  <div>
+                    <h3 className="text-lg font-black font-display text-agency-ink group-hover:text-agency-accent transition-colors">{appr.subject}</h3>
+                    <div className="flex items-center gap-4 mt-2">
+                      <div className="flex items-center gap-1.5">
+                        <Users2 className="w-3.5 h-3.5 text-agency-muted" />
+                        <span className="text-[11px] font-bold text-agency-ink">{appr.recipient_count.toLocaleString()} Recipients</span>
+                      </div>
+                      <div className="w-1 h-1 rounded-full bg-agency-border" />
+                      <div className="flex items-center gap-1.5">
+                        <UserCircle className="w-3.5 h-3.5 text-agency-muted" />
+                        <span className="text-[11px] font-bold text-agency-ink">{appr.requester}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-agency-bg rounded-xl border border-agency-border italic text-[11px] text-agency-muted">
+                    "{appr.body_preview}"
+                  </div>
+                </div>
+
+                <div className="lg:w-72 space-y-4">
+                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col items-center justify-center text-center">
+                    <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1">Risk Quotient</div>
+                    <div className={cn(
+                      "text-3xl font-black font-display tracking-tighter",
+                      appr.risk_score > 0.7 ? "text-red-500" : "text-amber-500"
+                    )}>{(appr.risk_score * 100).toFixed(0)}%</div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {appr.compliance_flags.map(f => (
+                      <span key={f} className="px-2 py-0.5 bg-red-50 text-red-600 border border-red-100 rounded-[4px] text-[8px] font-black uppercase tracking-tight">{f}</span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="px-8 py-6 bg-agency-bg border-t border-agency-border flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black uppercase text-agency-muted tracking-widest">Status:</span>
+                  <div className={cn(
+                    "px-2 py-1 rounded text-[9px] font-black uppercase tracking-widest",
+                    appr.status === 'APPROVED' ? "bg-emerald-500 text-white" :
+                    appr.status === 'REVISION_REQUESTED' ? "bg-red-500 text-white" :
+                    "bg-blue-500 text-white"
+                  )}>
+                    {appr.status.replace(/_/g, ' ')}
+                  </div>
+                </div>
+
+                {appr.status !== 'APPROVED' && appr.status !== 'REVISION_REQUESTED' && (
+                  <div className="flex gap-3">
+                    <button 
+                      onClick={() => onHandle(appr.id, 'reject')}
+                      className="px-6 py-2.5 bg-white border border-agency-border rounded-xl text-[10px] font-black uppercase tracking-widest hover:border-red-500 hover:text-red-500 transition-all flex items-center gap-2"
+                    >
+                      <X className="w-3.5 h-3.5" /> Reject
+                    </button>
+                    <button 
+                      onClick={() => onHandle(appr.id, 'approve')}
+                      className="px-6 py-2.5 bg-agency-ink text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500 transition-all flex items-center gap-2 shadow-lg shadow-agency-ink/10"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5" /> Approve Dispatch
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+};
+
+const QueryAgentView = ({ onAction, tenantId }: { onAction: (name: string, type?: string) => void, tenantId: string }) => {
+  const [query, setQuery] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [history, setHistory] = useState<QueryLogEntry[]>([]);
+  const [activeResponse, setActiveResponse] = useState<QueryResponse | null>(null);
+
+  const handleQuery = async (q: string = query) => {
+    if (!q.trim()) return;
+    setIsProcessing(true);
+    onAction('Query Agent: Interrogating platform nodes...', 'info');
+
+    try {
+      const response = await fetch('/api/v1/query/process', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: q, context: { tenant_id: tenantId } })
+      });
+
+      if (!response.ok) throw new Error('Query Interface Error');
+      const data: QueryResponse = await response.json();
+      
+      const newEntry: QueryLogEntry = {
+        id: `q-${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        query: q,
+        response: data,
+        type: q.toLowerCase().includes('write') || q.toLowerCase().includes('generate') ? 'creative' : 'operational'
+      };
+
+      setHistory(prev => [newEntry, ...prev]);
+      setActiveResponse(data);
+      setQuery('');
+      onAction('Query response received with high confidence.', 'success');
+    } catch (error) {
+      console.error(error);
+      onAction('Query Agent: Sequence protocol fault.', 'error');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  return (
+    <div className="max-w-5xl mx-auto space-y-8 animate-in slide-in-from-bottom-4 duration-500">
+      <div className="flex items-center gap-4 p-8 bg-agency-ink text-white rounded-[2.5rem] shadow-2xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-agency-accent/10 blur-3xl -mr-32 -mt-32" />
+        <div className="p-4 bg-white/10 rounded-2xl border border-white/10 backdrop-blur-sm z-10">
+          <Brain className="w-8 h-8 text-agency-accent" />
+        </div>
+        <div className="z-10 flex-1">
+          <h2 className="text-2xl font-black font-display uppercase tracking-tight">Intelligent Query Agent</h2>
+          <p className="text-[10px] font-bold text-white/40 uppercase tracking-[0.2em] mt-1">Cross-Platform Analytical Intelligence Layer</p>
+        </div>
+        <div className="px-4 py-2 bg-white/5 rounded-xl border border-white/10 text-right z-10 hidden sm:block">
+          <div className="text-[10px] font-black uppercase text-agency-accent tracking-tighter">Model Stability</div>
+          <div className="text-xl font-black font-mono">99.8%</div>
+        </div>
+      </div>
+
+      <div className="relative group">
+        <div className="absolute -inset-1 bg-gradient-to-r from-agency-accent to-blue-600 rounded-[2rem] blur opacity-25 group-hover:opacity-40 transition duration-1000 group-hover:duration-200"></div>
+        <div className="relative flex items-center gap-4 p-2 bg-white border border-agency-border rounded-[2rem] shadow-xl">
+          <div className="pl-6 flex-1">
+             <input 
+               type="text" 
+               value={query}
+               onChange={(e) => setQuery(e.target.value)}
+               onKeyDown={(e) => e.key === 'Enter' && handleQuery()}
+               placeholder="Ask anything about spend, ROAS, strategy, or creative generation..."
+               className="w-full bg-transparent border-none text-agency-ink font-bold focus:ring-0 placeholder:text-agency-muted/50"
+             />
+          </div>
+          <button 
+            onClick={() => handleQuery()}
+            disabled={isProcessing || !query.trim()}
+            className="p-4 bg-agency-accent text-white rounded-full hover:scale-105 active:scale-95 transition-all shadow-lg shadow-agency-accent/20 disabled:opacity-50"
+          >
+            {isProcessing ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+          </button>
+        </div>
+      </div>
+
+      {activeResponse && (
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="grid grid-cols-1 lg:grid-cols-3 gap-8"
+        >
+          <div className="lg:col-span-2 space-y-6">
+            <div className="panel-card p-8 border-l-4 border-l-agency-accent">
+               <div className="flex items-center justify-between mb-4">
+                 <span className="text-[10px] font-black uppercase text-agency-accent tracking-widest flex items-center gap-2">
+                   <div className="w-1.5 h-1.5 rounded-full bg-current" /> Agent Consensus
+                 </span>
+                 <span className="text-[10px] font-mono text-agency-muted">Confidence: {(activeResponse.confidence_score * 100).toFixed(1)}%</span>
+               </div>
+               <p className="text-lg font-bold leading-relaxed text-agency-ink">{activeResponse.answer}</p>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+               {Object.entries(activeResponse.supporting_data.metrics).map(([key, val]) => (
+                 <div key={key} className="panel-card p-4 bg-white border-agency-border">
+                    <div className="text-[9px] font-black uppercase text-agency-muted mb-1 truncate">{key.replace(/_/g, ' ')}</div>
+                    <div className="text-xl font-black text-agency-ink">{String(val)}</div>
+                 </div>
+               ))}
+            </div>
+
+            {activeResponse.supporting_data.charts.map((chart, idx) => (
+              <div key={idx} className="panel-card p-6">
+                <h3 className="text-sm font-bold uppercase tracking-tight text-agency-ink mb-6">{chart.title}</h3>
+                <div className="h-[200px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chart.data}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 9, fill: '#94a3b8'}} />
+                      <YAxis axisLine={false} tickLine={false} tick={{fontSize: 9, fill: '#94a3b8'}} />
+                      <Tooltip />
+                      <Bar dataKey="value" fill="var(--agency-accent)" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="space-y-6">
+            <div className="panel-card p-6 bg-agency-bg/50 border-dashed">
+              <h3 className="text-[10px] font-black uppercase tracking-widest text-agency-muted mb-4">Recommended Actions</h3>
+              <div className="space-y-2">
+                {activeResponse.recommended_actions.map((action, idx) => (
+                  <button 
+                    key={idx}
+                    onClick={() => onAction(`Agent Action: ${action}`, 'success')}
+                    className="w-full p-3 bg-white border border-agency-border rounded-xl text-left hover:border-agency-accent transition-all group flex items-start gap-3"
+                  >
+                    <div className="p-1 bg-agency-bg rounded-md group-hover:text-agency-accent transition-colors">
+                      <Zap className="w-3 h-3" />
+                    </div>
+                    <span className="text-[11px] font-bold text-agency-ink">{action}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="panel-card p-6">
+              <h3 className="text-[10px] font-black uppercase tracking-widest text-agency-muted mb-4">Related Intelligence</h3>
+              <div className="space-y-3">
+                {activeResponse.related_questions.map((q, idx) => (
+                  <button 
+                    key={idx}
+                    onClick={() => handleQuery(q)}
+                    className="text-[11px] font-bold text-agency-accent hover:underline text-left block leading-snug"
+                  >
+                    "{q}"
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="panel-card p-4 bg-slate-50 border-slate-100 italic">
+               <div className="flex items-center gap-2 mb-2">
+                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+                 <span className="text-[9px] font-black uppercase text-emerald-600 tracking-widest">Grounding Sources</span>
+               </div>
+               <div className="flex flex-wrap gap-2">
+                 {activeResponse.supporting_data.sources.map(s => (
+                   <span key={s} className="text-[9px] font-bold px-1.5 py-0.5 bg-white border border-slate-200 rounded text-slate-500">{s}</span>
+                 ))}
+               </div>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      <div className="space-y-4">
+        <h3 className="text-[10px] font-black uppercase tracking-widest text-agency-muted px-4">Conversation History</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            "What is my current monthly ad spend across all clients?",
+            "Which campaign has the highest ROAS this week?",
+            "Generate 5 subject lines for my welcome series",
+            "Why is my Meta Pixel not firing conversion events?"
+          ].map((example, idx) => (
+            <button 
+              key={idx}
+              onClick={() => handleQuery(example)}
+              className="p-4 bg-white border border-agency-border rounded-2xl text-left hover:border-agency-accent transition-all group"
+            >
+              <div className="p-2 bg-agency-bg rounded-lg mb-3 group-hover:text-agency-accent transition-colors w-min">
+                <Search className="w-3.5 h-3.5" />
+              </div>
+              <p className="text-[11px] font-bold text-agency-ink leading-tight line-clamp-2">{example}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const OnlineOpsView = ({ 
   onAction,
@@ -5308,319 +6292,659 @@ const PPCOpsView = ({ onAction, tenantId, setLogs, a2aStatus, setA2aStatus, clou
 const SocialMediaView = ({ onAction }: { onAction: (name: string, type?: string) => void }) => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState(0);
-  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<string>(new Date().toISOString());
+  const [activeAlerts, setActiveAlerts] = useState<string[]>(['CTR dropped below 1% on "Spring Awareness" campaign']);
+  const [optimizations, setOptimizations] = useState<{ id: string, title: string, reason: string, priority: 'high' | 'medium' }[]>([
+    { id: 'opt-1', title: 'Post Optimization: Narrative Shift', reason: 'Engagement Rate fluctuated by 18% in the last 12h', priority: 'high' },
+    { id: 'opt-2', title: 'Creative Refresh: High Fatigue', reason: 'CTR dropped below 0.8% on "Summer Sale" variant', priority: 'high' },
+    { id: 'opt-3', title: 'Budget Reallocation', reason: 'TikTok ROAS (5.2x) outperforming Meta (3.8x)', priority: 'medium' }
+  ]);
+  const [leadSources, setLeadSources] = useState([
+    { source: 'Meta Ads', count: 842, percentage: 65, trend: 'up', campaigns: [
+      { name: 'Spring Awareness', leads: 412 },
+      { name: 'Direct Response v2', leads: 430 }
+    ]},
+    { source: 'LinkedIn Org', count: 212, percentage: 17, trend: 'down', campaigns: [
+      { name: 'Talent Acquisition', leads: 94 },
+      { name: 'Executive Thought Leadership', leads: 118 }
+    ]},
+    { source: 'TikTok Shop', count: 184, percentage: 14, trend: 'up', campaigns: [
+      { name: 'Viral Challenge Push', leads: 184 }
+    ]},
+    { source: 'X (Twitter)', count: 46, percentage: 4, trend: 'stable', campaigns: [
+      { name: 'Community Pulse', leads: 46 }
+    ]},
+  ]);
+  const [roasData, setRoasData] = useState({ adSpend: 42000, revenue: 176400, socialCommerceRevenue: 52000, status: 'STABLE' });
+  const [showNewCampaignModal, setShowNewCampaignModal] = useState(false);
+  const [finishedCampaigns] = useState([
+    { id: 'fc-1', name: 'Q1 Brand Awareness', finalRoas: 4.1, conversions: 1240, status: 'Completed', platform: 'Meta' },
+    { id: 'fc-2', name: 'Legacy Retargeting', finalRoas: 6.8, conversions: 840, status: 'Completed', platform: 'LinkedIn' },
+  ]);
 
-  const handleSync = () => {
-    if (isSyncing) return;
+  const predictiveData = [
+    { day: 'Day 1', roas: 4.2 },
+    { day: 'Day 5', roas: 4.5 },
+    { day: 'Day 10', roas: 4.8 },
+    { day: 'Day 15', roas: 4.6 },
+    { day: 'Day 20', roas: 5.1 },
+    { day: 'Day 25', roas: 5.4 },
+    { day: 'Day 30', roas: 5.8 },
+  ];
+
+  const calculateSocialValue = (adSpend: number, revenue: number) => {
+    if (adSpend === 0) {
+      onAction('Maintenance Agent Alert: Ad Spend data missing. Checking API connectivity for Meta/Stripe bridge...', 'error');
+      return { roas: 0, alert: "API Sync Failure: Ad Spend Null" };
+    }
+    
+    if (revenue === 0) {
+      onAction('Maintenance Agent Alert: Zero Revenue detected. Critical: Verifying Pixel health and checkout connectivity...', 'error');
+      return { roas: 0, alert: "Pixel Warning: Zero Revenue Sync" };
+    }
+
+    const roas = revenue / adSpend;
+    if (roas < 1.0) {
+      onAction('Optimization Trigger: ROAS below threshold. Suggesting pivot to high-intent Creative variants.', 'warning');
+      return { roas, alert: "Low Performance: Pivot Suggested" };
+    }
+    
+    return { roas, alert: "Healthy Performance" };
+  };
+
+  const handleMaintenanceCheck = () => {
     setIsSyncing(true);
     setSyncProgress(0);
-    onAction('Initializing product catalog sync with Meta Commerce...', 'info');
+    onAction('A2A Validator: Initiating Lead Attribution & Pixel Parity Audit...', 'info');
+
+    // Simulate integrity check between platforms and tracking pixels
+    setTimeout(() => {
+      onAction('Integrity Check: Verifying 1,284 leads across 7 distributed nodes...', 'info');
+    }, 800);
+
+    // Logic implementation for ROAS cross-referencing
+    const result = calculateSocialValue(roasData.adSpend, roasData.revenue);
 
     const interval = setInterval(() => {
       setSyncProgress(prev => {
         if (prev >= 100) {
           clearInterval(interval);
           setIsSyncing(false);
-          onAction('Catalog sync completed. 1,284 products verified.', 'success');
+          setLastUpdated(new Date().toISOString());
+          onAction(`A2A Success: ${result.alert}. Lead parity verified at 99.8%. ROAS verified at ${result.roas.toFixed(2)}x.`, result.roas >= 1 ? 'success' : 'warning');
           return 100;
         }
-        return prev + Math.floor(Math.random() * 15) + 5;
+        return prev + 10;
       });
-    }, 300);
+    }, 200);
   };
+
+  // Mock data for the 4 pillars
+  const pillars = [
+    { label: 'Engagement Rate', value: '5.8%', target: '4.5%', sub: 'Community Resonance', trend: 'up' },
+    { label: 'Lead Generation', value: '1,284', target: '1,000', sub: 'Lead Mix: 65% Paid', trend: 'up' },
+    { label: 'Customer Service', value: '12m', target: '< 15m', sub: 'Resolution Rate: 94%', trend: 'down' },
+    { label: 'Social Commerce ROAS', value: '5.2x', target: '4.0x', sub: 'Direct Shop Conv.', trend: 'up' },
+  ];
 
   return (
     <div className="space-y-8 animate-in slide-in-from-right-4 duration-500">
-      <div className="flex justify-between items-center">
+      {/* Header & Global Controls */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-[2rem] border border-agency-border shadow-sm">
         <div>
-          <h2 className="text-2xl font-bold font-display uppercase tracking-tight text-agency-ink">Social Ops</h2>
-          <p className="text-xs text-agency-muted font-bold uppercase tracking-widest mt-1">META MARKETING API INTEGRATION (v19.0)</p>
-        </div>
-        <div className="flex gap-2">
-          <div className={cn(
-            "flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-bold uppercase border",
-            META_PIXEL.status === 'active' ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-red-50 border-red-100 text-red-600'
-          )}>
-            <Activity className="w-3.5 h-3.5" /> Pixel: {META_PIXEL.status}
+          <div className="flex items-center gap-2 mb-1">
+            <h2 className="text-2xl font-black font-display uppercase tracking-tight text-agency-ink">Social Hub</h2>
+            <div className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[9px] font-black uppercase tracking-widest rounded border border-blue-100">Agentic v2.4</div>
           </div>
+          <p className="text-xs text-agency-muted font-bold uppercase tracking-widest flex items-center gap-2">
+            <Clock className="w-3 h-3" /> Last Full Update: {new Date(lastUpdated).toLocaleTimeString()} (A2A Scheduled)
+          </p>
+        </div>
+        <div className="flex gap-3">
           <button 
-            disabled={isSyncing}
-            onClick={handleSync}
-            className={cn(
-              "px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest flex items-center gap-2 shadow-lg transition-all relative overflow-hidden",
-              isSyncing ? "bg-slate-100 text-slate-400 cursor-not-allowed" : "bg-agency-accent text-white hover:scale-105 active:scale-95 shadow-agency-accent/20"
-            )}
+            onClick={() => setShowNewCampaignModal(true)}
+            className="px-6 py-3 bg-agency-accent text-white rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:scale-105 active:scale-95 transition-all shadow-xl shadow-agency-accent/20"
           >
-            {isSyncing && (
-              <motion.div 
-                className="absolute left-0 top-0 h-full bg-white/20 transition-all duration-300"
-                style={{ width: `${syncProgress}%` }}
-              />
-            )}
-            <RefreshCw className={cn("w-3.5 h-3.5", isSyncing && "animate-spin")} /> 
-            {isSyncing ? `Syncing ${syncProgress}%` : 'Sync Catalog'}
+            <Plus className="w-4 h-4" />
+            Launch Campaign
+          </button>
+          <button 
+            onClick={handleMaintenanceCheck}
+            disabled={isSyncing}
+            className="px-6 py-3 bg-agency-ink text-white rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-agency-accent transition-all shadow-xl shadow-agency-ink/10"
+          >
+            {isSyncing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+            Maintenance Audit
           </button>
         </div>
       </div>
 
-    {/* Section 1: Campaign Pulse & Tracking Health */}
-    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-      <div className="lg:col-span-3 panel-card p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="font-bold text-lg font-display">Meta Campaign Manager</h3>
-          <div className="flex gap-4">
-            <div className="text-right">
-              <div className="text-[9px] font-bold uppercase text-agency-muted">Match Quality</div>
-              <div className="text-sm font-bold text-agency-accent">{META_PIXEL.matchQuality}/10</div>
+      {/* Analytics Pillar Dashboard */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {pillars.map((p) => (
+          <div key={p.label} className="panel-card p-6 border-l-4 border-l-agency-accent">
+            <div className="flex justify-between items-start mb-4">
+              <span className="text-[10px] font-black uppercase tracking-widest text-agency-muted">{p.label}</span>
+              {p.trend === 'up' ? <ArrowUpRight className="w-4 h-4 text-emerald-500" /> : <ArrowDownRight className="w-4 h-4 text-red-500" />}
             </div>
-            <div className="text-right">
-              <div className="text-[9px] font-bold uppercase text-agency-muted">CAPI Status</div>
-              <div className="text-sm font-bold text-emerald-600 uppercase">{META_PIXEL.capiStatus}</div>
+            <div className="text-3xl font-black font-display text-agency-ink mb-1">{p.value}</div>
+            <div className="text-[10px] font-bold text-agency-muted uppercase mb-4">Target: {p.target}</div>
+            <div className="pt-4 border-t border-agency-border flex items-center justify-between">
+              <span className="text-[9px] font-black uppercase text-agency-muted tracking-tighter">{p.sub}</span>
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             </div>
           </div>
-        </div>
-        <div className="space-y-4">
-          {META_CAMPAIGNS.map((c) => (
-            <div key={c.id} className="p-4 bg-agency-bg rounded-xl border border-agency-border flex items-center justify-between group hover:border-agency-accent transition-all cursor-pointer">
+        ))}
+      </div>
+
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Strategy Agent & Smart Actions */}
+        <div className="lg:col-span-2 space-y-8">
+          <div className="panel-card p-8 border-t-4 border-t-purple-500">
+            <div className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-4">
-                <div className="p-2.5 bg-white rounded-xl border border-agency-border group-hover:bg-agency-accent/10 transition-colors">
-                  <MetaIcon className="w-5 h-5 text-agency-accent" />
+                <div className="p-3 bg-purple-500/10 rounded-2xl">
+                  <Brain className="w-6 h-6 text-purple-600" />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-agency-ink">{c.name}</span>
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 font-bold uppercase tracking-widest">{c.objective}</span>
+                  <h3 className="text-xl font-black font-display uppercase tracking-tight text-agency-ink">Strategy Agent: Pipeline Anchor</h3>
+                  <p className="text-[10px] font-bold text-purple-600 uppercase tracking-widest">Revenue Attribution & Performance Velocity</p>
+                </div>
+              </div>
+              <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl text-right">
+                <div className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5">Predictive ROAS (30d)</div>
+                <div className="text-xl font-black text-emerald-900">5.8x</div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              <div className="p-6 bg-slate-900 rounded-3xl text-white">
+                <div className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2">Total Pipeline Contribution</div>
+                <div className="text-4xl font-black font-display text-emerald-400 mb-2 font-mono">$184,200.00</div>
+                <p className="text-xs text-slate-500 font-medium">Calculated from 1,284 leads @ 12% projected LTV conversion.</p>
+                <div className="mt-6 flex items-center gap-2">
+                   <TrendingUp className="w-4 h-4 text-emerald-400" />
+                   <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400">+14% vs Previous Cycle</span>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="p-4 bg-agency-bg rounded-2xl border border-agency-border">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-[10px] font-black uppercase text-agency-muted">Lead Source Distribution</span>
+                    <span className="text-[9px] font-black text-agency-ink">Top: Meta Ads</span>
                   </div>
-                  <div className="flex items-center gap-3 mt-1.5">
-                    <div className="flex items-center gap-1 text-[10px] font-bold text-agency-muted uppercase">
-                      <span className="px-1 py-0.5 bg-white rounded border border-agency-border">{c.budget.type}</span>
-                      <span>${c.budget.amount.toLocaleString()}</span>
+                  <div className="flex gap-1 h-2 mb-3">
+                    {leadSources.map((ls, i) => (
+                      <div 
+                        key={ls.source} 
+                        className={cn(
+                          "h-full first:rounded-l-full last:rounded-r-full",
+                          i === 0 ? "bg-agency-accent w-[65%]" : 
+                          i === 1 ? "bg-blue-400 w-[17%]" : 
+                          i === 2 ? "bg-emerald-400 w-[14%]" : "bg-slate-300 w-[4%]"
+                        )} 
+                        title={`${ls.source}: ${ls.count} leads`}
+                      />
+                    ))}
+                  </div>
+                  <div className="space-y-2">
+                    {leadSources.map(ls => (
+                      <div key={ls.source} className="group/ls">
+                        <div className="flex justify-between items-center px-3 py-1.5 bg-white rounded-xl border border-agency-border group-hover/ls:border-agency-accent transition-all cursor-default">
+                          <div className="flex items-center gap-2">
+                            <div className={cn(
+                              "w-1.5 h-1.5 rounded-full",
+                              ls.source === 'Meta Ads' ? "bg-agency-accent" : 
+                              ls.source === 'LinkedIn Org' ? "bg-blue-400" : 
+                              ls.source === 'TikTok Shop' ? "bg-emerald-400" : "bg-slate-300"
+                            )} />
+                            <span className="text-[9px] font-black text-agency-ink uppercase tracking-tighter">{ls.source}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-black text-agency-ink">{ls.count}</span>
+                            {ls.trend === 'up' ? <ArrowUpRight className="w-2.5 h-2.5 text-emerald-500" /> : <ArrowDownRight className="w-2.5 h-2.5 text-red-500" />}
+                          </div>
+                        </div>
+                        {/* Campaign Breakdown Tooltip-style hidden list */}
+                        <div className="hidden group-hover/ls:block mt-1 pl-4 space-y-1 animate-in fade-in slide-in-from-top-1 duration-200">
+                           {ls.campaigns.map(camp => (
+                             <div key={camp.name} className="flex justify-between items-center text-[8px] font-bold text-agency-muted uppercase tracking-widest bg-agency-bg/50 px-2 py-0.5 rounded">
+                                <span>{camp.name}</span>
+                                <span>{camp.leads}</span>
+                             </div>
+                           ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                   <div className="flex-1 p-4 bg-blue-50 border border-blue-100 rounded-2xl">
+                      <div className="text-[9px] font-black text-blue-600 uppercase mb-1">Commerce ROAS</div>
+                      <div className="text-xl font-black text-blue-900">5.2x</div>
+                   </div>
+                   <div className="flex-1 p-4 bg-emerald-50 border border-emerald-100 rounded-2xl">
+                      <div className="text-[9px] font-black text-emerald-600 uppercase mb-1">Blended ROAS</div>
+                      <div className="text-xl font-black text-emerald-900">4.2x</div>
+                   </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-8 pt-8 border-t border-agency-border">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-2">
+                   <LineChart className="w-4 h-4 text-agency-accent" />
+                   <h4 className="text-[10px] font-black uppercase text-agency-muted tracking-widest">30-Day ROAS Forecast (Predictive Agent)</h4>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="flex gap-2">
+                    {[
+                      { label: 'Seasonality', val: '+12%', color: 'text-emerald-500' },
+                      { label: 'Creative', val: '+8%', color: 'text-blue-500' },
+                      { label: 'Market', val: '-3%', color: 'text-slate-400' }
+                    ].map(factor => (
+                      <div key={factor.label} className="px-2 py-0.5 bg-agency-bg rounded border border-agency-border flex items-center gap-1.5">
+                        <span className="text-[7px] font-black uppercase text-agency-muted">{factor.label}</span>
+                        <span className={cn("text-[8px] font-black", factor.color)}>{factor.val}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="text-[9px] font-bold text-emerald-600 uppercase bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                    Confidence: 94.2%
+                  </div>
+                </div>
+              </div>
+              <div className="h-[220px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={predictiveData}>
+                    <defs>
+                      <linearGradient id="colorRoas" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="var(--color-agency-accent)" stopOpacity={0.15}/>
+                        <stop offset="95%" stopColor="var(--color-agency-accent)" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                    <XAxis 
+                      dataKey="day" 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fontSize: 9, fontWeight: 700, fill: '#64748b' }} 
+                      dy={10}
+                    />
+                    <YAxis 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fontSize: 9, fontWeight: 700, fill: '#64748b' }} 
+                    />
+                    <Tooltip 
+                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)', fontSize: '10px', fontWeight: 'bold' }}
+                      cursor={{ stroke: 'var(--color-agency-accent)', strokeWidth: 1 }}
+                    />
+                    <Area type="monotone" dataKey="roas" stroke="var(--color-agency-accent)" strokeWidth={3} fillOpacity={1} fill="url(#colorRoas)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+               <h4 className="text-[10px] font-black uppercase text-agency-muted tracking-widest flex items-center gap-2">
+                 <Wand2 className="w-3.5 h-3.5" /> Autonomous Smart Actions
+               </h4>
+               {optimizations.map((opt) => (
+                 <div key={opt.id} className="p-5 bg-white border border-agency-border shadow-sm rounded-2xl flex items-center justify-between group hover:border-purple-400 transition-all">
+                    <div className="flex items-center gap-4">
+                       <div className={cn(
+                         "w-2 h-10 rounded-full",
+                         opt.priority === 'high' ? "bg-red-500" : "bg-purple-500"
+                       )} />
+                       <div>
+                          <div className="flex items-center gap-2">
+                             <div className="text-sm font-black text-agency-ink">{opt.title}</div>
+                             {opt.priority === 'high' && <AlertCircle className="w-3 h-3 text-red-500" />}
+                          </div>
+                          <div className="text-[10px] font-bold text-agency-muted mt-0.5">{opt.reason}</div>
+                       </div>
                     </div>
-                    <div className="h-2 w-px bg-agency-border" />
-                    <span className="text-[10px] font-bold text-agency-ink">${c.performance.spend.toLocaleString()} SPENT</span>
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-8">
-                <div className="text-right hidden sm:block">
-                  <div className="text-[9px] font-bold text-agency-muted uppercase">CTR</div>
-                  <div className="text-sm font-bold text-agency-ink">{c.performance.ctr}%</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-[9px] font-bold text-agency-muted uppercase">ROAS</div>
-                  <div className="text-sm font-bold text-emerald-600">{c.performance.roas || '--'}x</div>
-                </div>
-                <div className="p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <ChevronRight className="w-4 h-4 text-agency-muted" />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="space-y-6">
-        <div className="panel-card p-6 border-agency-accent/20 bg-agency-panel">
-          <h3 className="font-bold font-display mb-4">Audience Engine</h3>
-          <div className="space-y-4">
-            {META_AUDIENCES.map((aud) => (
-              <div key={aud.id} className="p-3 bg-white rounded-lg border border-agency-border space-y-2">
-                <div className="flex justify-between items-start">
-                  <div className="text-[10px] font-bold text-agency-ink uppercase truncate pr-2">{aud.name}</div>
-                  <span className="text-[8px] font-bold px-1 py-0.5 bg-blue-50 text-blue-600 rounded">{aud.type}</span>
-                </div>
-                <div className="flex justify-between items-end">
-                  <span className="text-lg font-bold font-display">{aud.size}</span>
-                  <div className="text-right">
-                    <div className="text-[8px] font-bold text-emerald-600">{aud.matchRate}% MATCH</div>
-                    <div className="text-[7px] text-agency-muted uppercase">Synced {new Date(aud.lastSynced).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-          <button 
-            onClick={() => onAction('Modeling high-intent lookalike audiences...', 'success')}
-            className="w-full mt-4 py-2 bg-agency-ink text-white rounded-lg text-[9px] font-bold uppercase tracking-widest hover:bg-agency-ink/90 transition-colors"
-          >
-            Generate Lookalike
-          </button>
-
-          <div className="mt-6 pt-6 border-t border-agency-border">
-            <div className="flex items-center gap-2 mb-3">
-              <Zap className="w-3.5 h-3.5 text-agency-accent" />
-              <span className="text-[10px] font-black uppercase text-agency-ink tracking-tight">Autonomous Expansion</span>
-            </div>
-            <div className="p-3 bg-agency-bg rounded-lg border border-dashed border-agency-border">
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-[10px] font-bold text-agency-ink">Purchase Lookalike 3%</span>
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-1">
-                    <div className={cn("w-1 h-1 rounded-full", autoRefresh ? "bg-emerald-500 animate-pulse" : "bg-agency-muted")} />
-                    <span className={cn("text-[8px] font-black uppercase tracking-tight", autoRefresh ? "text-emerald-500" : "text-agency-muted")}>
-                      {autoRefresh ? "Auto-Refresh Active" : "Refresh Paused"}
-                    </span>
-                  </div>
-                  <button 
-                    onClick={() => {
-                      setAutoRefresh(!autoRefresh);
-                      onAction(`${autoRefresh ? 'Disabling' : 'Enabling'} automatic refresh for Purchase Lookalike 3%...`, 'info');
-                    }}
-                    className={cn(
-                      "w-6 h-3 rounded-full relative transition-colors duration-200",
-                      autoRefresh ? "bg-emerald-500" : "bg-agency-muted"
-                    )}
-                  >
-                    <div className={cn(
-                      "absolute top-0.5 w-2 h-2 rounded-full bg-white transition-all duration-200",
-                      autoRefresh ? "left-[15px]" : "left-[3px]"
-                    )} />
-                  </button>
-                </div>
-              </div>
-              <p className="text-[9px] text-agency-muted mb-3 italic">Derived from: Purchase Lookalike 1%</p>
-              <div className="flex items-center justify-between">
-                <div className="px-2 py-0.5 bg-white rounded border border-agency-border text-[8px] font-bold text-agency-muted uppercase">
-                  Similarity: 3%
-                </div>
-                <button 
-                  onClick={() => onAction('Recalibrating 3% lookalike audience from latest 1% seed population...', 'info')}
-                  className="text-[8px] font-black uppercase text-agency-accent hover:opacity-70 transition-opacity"
-                >
-                  Force Sync
-                </button>
-              </div>
+                    <button 
+                      onClick={() => {
+                        onAction(`Executing: ${opt.title}`, 'success');
+                        setOptimizations(prev => prev.filter(o => o.id !== opt.id));
+                      }}
+                      className="px-4 py-2 bg-purple-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-purple-600/20 opacity-0 group-hover:opacity-100 transition-all"
+                    >
+                      Optimize Now
+                    </button>
+                 </div>
+               ))}
             </div>
           </div>
-        </div>
 
-        <div className="panel-card p-6">
-          <h3 className="font-bold font-display mb-4">Event Velocity</h3>
-          <div className="space-y-4">
-            <div className="flex items-end justify-between gap-1 h-12">
-              {[40, 70, 45, 90, 65, 80, 55].map((h, i) => (
-                <div key={i} className="flex-1 bg-agency-accent/20 rounded-t-sm relative group">
-                  <div className="absolute bottom-0 w-full bg-agency-accent rounded-t-sm group-hover:bg-agency-ink transition-colors" style={{ height: `${h}%` }} />
+          <div className="panel-card p-8">
+            <div className="flex items-center justify-between mb-8">
+              <h3 className="font-bold text-lg font-display uppercase tracking-tight">Active Campaigns & Node Status</h3>
+              <div className="flex gap-2">
+                 {['Meta', 'LinkedIn', 'TikTok'].map(p => (
+                   <span key={p} className="text-[10px] font-black text-agency-muted hover:text-agency-ink cursor-pointer border-b-2 border-transparent hover:border-agency-accent pb-1">{p}</span>
+                 ))}
+              </div>
+            </div>
+            
+            <div className="space-y-4">
+              {META_CAMPAIGNS.map((c) => (
+                <div key={c.id} className="p-4 bg-agency-bg rounded-2xl border border-agency-border hover:border-agency-accent/50 transition-all">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-white rounded-xl border border-agency-border">
+                        <MetaIcon className="w-4 h-4 text-agency-accent" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-black text-agency-ink tracking-tight">{c.name}</div>
+                        <div className="text-[10px] font-bold text-agency-muted uppercase tracking-widest">{c.objective} • ${c.budget.amount.toLocaleString()}/{c.budget.type.toLowerCase()}</div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                       <div className="text-[14px] font-black text-agency-ink">{c.performance.roas}x</div>
+                       <div className="text-[9px] font-black text-agency-muted uppercase tracking-widest">ROAS</div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-6 pt-4 border-t border-agency-border/50">
+                    <div>
+                      <div className="text-[9px] font-black text-agency-muted uppercase mb-1">CTR</div>
+                      <div className="text-xs font-bold">{c.performance.ctr}%</div>
+                    </div>
+                    <div>
+                      <div className="text-[9px] font-black text-agency-muted uppercase mb-1">CPC</div>
+                      <div className="text-xs font-bold text-agency-ink">$1.24</div>
+                    </div>
+                    <div>
+                      <div className="text-[9px] font-black text-agency-muted uppercase mb-1">Node Convergence</div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-1 bg-white rounded-full overflow-hidden border border-agency-border">
+                          <div className="h-full bg-agency-accent w-full" />
+                        </div>
+                        <span className="text-[10px] font-bold">100%</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
-            <div className="flex justify-between items-center text-[10px] font-bold uppercase">
-              <span className="text-agency-muted">Last 24h</span>
-              <span className="text-agency-ink">{(META_PIXEL.eventsLast24h / 1000).toFixed(1)}k Segments</span>
+          </div>
+
+          <div className="panel-card p-8">
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-3">
+                 <History className="w-5 h-5 text-agency-muted" />
+                 <h3 className="font-bold text-lg font-display uppercase tracking-tight">Post-Campaign Analysis</h3>
+              </div>
+              <button 
+                onClick={() => onAction('Generating cross-campaign meta-analysis report...', 'info')}
+                className="text-[10px] font-black uppercase text-agency-accent hover:underline"
+              >
+                Deep Analysis Report
+              </button>
+            </div>
+            <div className="space-y-4">
+              {finishedCampaigns.map((c) => (
+                <div key={c.id} className="p-4 bg-agency-bg rounded-2xl border border-agency-border flex items-center justify-between group hover:border-agency-ink transition-all">
+                  <div className="flex items-center gap-4">
+                    <div className="p-2 bg-white rounded-xl border border-agency-border group-hover:border-agency-ink transition-colors">
+                      <BarChart3 className="w-4 h-4 text-agency-muted group-hover:text-agency-ink" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-black text-agency-ink">{c.name}</div>
+                      <div className="text-[9px] font-bold text-agency-muted uppercase tracking-widest leading-none mt-1">{c.platform} • {c.conversions} Conversions</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-8">
+                    <div className="text-right">
+                       <div className="text-[14px] font-black text-emerald-600">{c.finalRoas}x</div>
+                       <div className="text-[9px] font-black text-agency-muted uppercase tracking-widest">Final ROAS</div>
+                    </div>
+                    <div className="px-3 py-1 bg-white border border-agency-border rounded-lg text-[9px] font-black uppercase tracking-widest text-agency-muted group-hover:text-agency-ink transition-colors">
+                      Archive
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Maintenance Agent & Resources */}
+        <div className="space-y-8">
+          <div className="panel-card p-6 bg-slate-900 text-white border-slate-800">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 bg-agency-accent/20 rounded-xl">
+                 <Shield className="w-5 h-5 text-agency-accent" />
+              </div>
+              <div>
+                <h3 className="font-bold font-display">Maintenance Agent</h3>
+                <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">A2A Integrity Validation</p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {[
+                { label: 'Pixel Status', val: 'Active (v19)', status: 'success' },
+                { label: 'Stripe ROAS Sync', val: 'Connected', status: 'success' },
+                { label: 'Meta Token', val: 'Expires in 42d', status: 'warning' },
+                { label: 'Landing Page Links', val: '6 verified', status: 'success' },
+              ].map(stat => (
+                <div key={stat.label} className="p-3 bg-white/5 rounded-xl border border-white/5 flex items-center justify-between">
+                  <div>
+                    <div className="text-[10px] text-slate-500 font-bold uppercase tracking-tight">{stat.label}</div>
+                    <div className="text-xs font-bold">{stat.val}</div>
+                  </div>
+                  <div className={cn(
+                    "w-1.5 h-1.5 rounded-full",
+                    stat.status === 'success' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-amber-500'
+                  )} />
+                </div>
+              ))}
+            </div>
+
+            {activeAlerts.length > 0 && (
+              <div className="mt-8 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl">
+                 <div className="flex items-center gap-2 mb-2 text-red-400">
+                    <ShieldAlert className="w-4 h-4" />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Active Anomalies</span>
+                 </div>
+                 <div className="space-y-2">
+                    {activeAlerts.map((alert, i) => (
+                      <div key={i} className="text-[11px] font-medium leading-tight text-white/80">• {alert}</div>
+                    ))}
+                 </div>
+                 <button 
+                  onClick={() => {
+                    onAction('Deploying A2A Debug sequence...', 'info');
+                    setActiveAlerts([]);
+                  }}
+                  className="w-full mt-4 py-2 bg-red-600 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-red-700 transition-colors"
+                 >
+                   Trigger Auto-Fix
+                 </button>
+              </div>
+            )}
+          </div>
+
+          <div className="panel-card p-6">
+            <h3 className="font-bold font-display mb-6 uppercase tracking-tight text-sm">High-Quality Resources</h3>
+            <div className="space-y-3">
+              {[
+                { label: 'Ads Management', site: 'Google Ads Transparency', url: 'https://adstransparency.google.com/', icon: Target },
+                { label: 'Pixel Tracking', site: 'Meta Events Manager', url: 'https://business.facebook.com/events_manager2/', icon: MetaIcon },
+                { label: 'Performance', site: 'Social Media Examiner', url: 'https://www.socialmediaexaminer.com/report/', icon: BarChartLucide },
+                { label: 'API Status', site: 'Stripe System Status', url: 'https://status.stripe.com/', icon: Activity },
+              ].map(res => (
+                <a 
+                  key={res.label}
+                  href={res.url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="p-4 bg-agency-bg rounded-2xl border border-agency-border flex items-center justify-between group hover:bg-white hover:border-agency-accent transition-all"
+                >
+                  <div className="flex items-center gap-4">
+                     <div className="p-2 bg-white rounded-xl border border-agency-border group-hover:border-agency-accent/50">
+                        <res.icon className="w-4 h-4 text-agency-muted group-hover:text-agency-accent" />
+                     </div>
+                     <div>
+                        <div className="text-[9px] font-black text-agency-muted uppercase tracking-widest leading-none mb-1">{res.label}</div>
+                        <div className="text-sm font-black text-agency-ink border-b border-transparent group-hover:border-agency-accent/30">{res.site}</div>
+                     </div>
+                  </div>
+                  <ExternalLink className="w-4 h-4 text-agency-border group-hover:text-agency-accent transition-colors" />
+                </a>
+              ))}
             </div>
           </div>
         </div>
       </div>
-    </div>
 
-    {/* Section 2: Creative Fatigue & Asset Library */}
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div className="panel-card p-6">
-        <div className="flex items-center gap-2 mb-6">
-          <Eye className="w-4 h-4 text-agency-accent" />
-          <h3 className="font-bold text-md font-display uppercase tracking-tight">Fatigue Monitor</h3>
-        </div>
-        <div className="space-y-4">
-          {META_CREATIVES.map((creative) => (
-            <div key={creative.id} className="p-4 bg-agency-bg rounded-xl border border-agency-border">
-              <div className="flex justify-between items-start mb-3">
-                <div>
-                  <div className="text-xs font-bold text-agency-ink">{creative.name}</div>
-                  <div className="text-[9px] text-agency-muted font-medium uppercase">{creative.type} • Freq: {creative.frequency}x</div>
+      <AnimatePresence>
+        {showNewCampaignModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-agency-ink/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="w-full max-w-2xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/20"
+            >
+              <div className="p-8 border-b border-agency-border flex justify-between items-center bg-slate-50">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-agency-accent/10 rounded-2xl text-agency-accent">
+                    <Rocket className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-black font-display uppercase tracking-tight text-agency-ink">New Social Campaign</h3>
+                    <p className="text-[10px] font-bold text-agency-muted uppercase tracking-widest">Autonomous Targeting & Variant Testing</p>
+                  </div>
                 </div>
-                <span className={cn(
-                  "text-[8px] font-bold px-1.5 py-0.5 rounded uppercase tracking-widest",
-                  creative.status === 'optimal' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600 animate-pulse'
-                )}>{creative.status.replace('_', ' ')}</span>
+                <button 
+                  onClick={() => setShowNewCampaignModal(false)}
+                  className="p-2 hover:bg-agency-bg rounded-xl transition-colors"
+                >
+                  <X className="w-6 h-6 text-agency-muted" />
+                </button>
               </div>
-              <div className="space-y-1.5">
-                <div className="flex justify-between text-[9px] font-bold uppercase tracking-widest">
-                  <span className="text-agency-muted">Fatigue Score</span>
-                  <span className={cn(creative.fatigueScore > 70 ? 'text-red-500' : 'text-agency-ink')}>{creative.fatigueScore}%</span>
-                </div>
-                <div className="h-1.5 w-full bg-white rounded-full overflow-hidden">
-                  <div className={cn(
-                    "h-full transition-all duration-500",
-                    creative.fatigueScore > 70 ? 'bg-red-500' : 'bg-agency-accent'
-                  )} style={{ width: `${creative.fatigueScore}%` }} />
-                </div>
-                <div className={cn(
-                  "text-[9px] font-bold uppercase text-right",
-                  creative.ctrShift < 0 ? 'text-red-500' : 'text-emerald-500'
-                )}>
-                  CTR Shift: {creative.ctrShift}%
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
 
-      <div className="lg:col-span-2 panel-card p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="font-bold text-lg font-display">A2A Auto-Rules Engine</h3>
-          <button 
-            onClick={() => onAction('Opening rule logic editor...', 'info')}
-            className="text-[10px] font-bold text-agency-accent uppercase tracking-widest hover:underline"
-          >
-            Edit logic
-          </button>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {[
-            { 
-              name: 'Creative Refresh Prot.', 
-              desc: 'If freq > 3.5 and CTR < 0.8% for 48h, pause and alert creative agent.', 
-              icon: HistoryIcon, 
-              status: 'Active',
-              color: 'text-emerald-500'
-            },
-            { 
-              name: 'Budget Surge Guard', 
-              desc: 'Scale daily budget by 15% if ROAS > 4.5x with consistent volume.', 
-              icon: Zap, 
-              status: 'Active',
-              color: 'text-emerald-500'
-            },
-            { 
-              name: 'Daypart Optimization', 
-              desc: 'Pause awareness flights between 02:00-06:00 to optimize CPM.', 
-              icon: Clock, 
-              status: 'Pending',
-              color: 'text-agency-muted'
-            },
-            { 
-              name: 'Conversion Anomaly', 
-              desc: 'Pause campaigns if conversion velocity drops > 80% vs 7d average.', 
-              icon: Shield, 
-              status: 'Active',
-              color: 'text-red-500'
-            }
-          ].map((rule) => (
-            <div key={rule.name} className="p-4 bg-agency-bg rounded-xl border border-agency-border flex items-start gap-4 h-full">
-              <div className="p-2 bg-white rounded-lg border border-agency-border mt-1">
-                <rule.icon className="w-4 h-4 text-agency-accent" />
-              </div>
-              <div className="flex-1 flex flex-col justify-between h-full">
-                <div>
-                  <h4 className="text-xs font-bold text-agency-ink mb-1">{rule.name}</h4>
-                  <p className="text-[10px] text-agency-muted leading-relaxed line-clamp-2">{rule.desc}</p>
+              <div className="p-8 max-h-[70vh] overflow-y-auto space-y-8">
+                {/* Targeting Section */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Target className="w-4 h-4 text-agency-accent" />
+                    <h4 className="text-[10px] font-black uppercase text-agency-ink tracking-widest">Targeting Parameters</h4>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] font-black uppercase text-agency-muted ml-1">Audience Segment</label>
+                      <select className="w-full p-3 bg-agency-bg border border-agency-border rounded-xl text-xs font-bold focus:ring-2 focus:ring-agency-accent outline-none">
+                        <option>Lookalike (1% - Purchases)</option>
+                        <option>Interest: High Fashion & Luxury</option>
+                        <option>Retargeting: Cart Abandoners (30d)</option>
+                        <option>Predictive: High LTV Forecast</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] font-black uppercase text-agency-muted ml-1">Geographic Location</label>
+                      <div className="relative">
+                        <MapPin className="absolute left-3 top-3 w-4 h-4 text-agency-muted" />
+                        <input 
+                          type="text" 
+                          placeholder="North America, EU (Tier 1)" 
+                          className="w-full p-3 pl-10 bg-agency-bg border border-agency-border rounded-xl text-xs font-bold focus:ring-2 focus:ring-agency-accent outline-none" 
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] font-black uppercase text-agency-muted ml-1">Age Range</label>
+                      <input type="text" placeholder="24 - 45" className="w-full p-3 bg-agency-bg border border-agency-border rounded-xl text-xs font-bold outline-none" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] font-black uppercase text-agency-muted ml-1">Gender</label>
+                      <select className="w-full p-3 bg-agency-bg border border-agency-border rounded-xl text-xs font-bold outline-none">
+                        <option>All</option>
+                        <option>Male</option>
+                        <option>Female</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] font-black uppercase text-agency-muted ml-1">Daily Budget</label>
+                      <div className="relative">
+                        <DollarSign className="absolute left-3 top-3 w-4 h-4 text-agency-muted" />
+                        <input type="number" placeholder="500" className="w-full p-3 pl-10 bg-agency-bg border border-agency-border rounded-xl text-xs font-bold outline-none" />
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex justify-between items-center mt-3 pt-3 border-t border-agency-border/50">
-                  <span className={cn("text-[9px] font-bold uppercase", rule.color)}>{rule.status}</span>
-                  <button className="text-agency-muted hover:text-agency-accent">
-                    <Settings className="w-3.5 h-3.5" />
-                  </button>
+
+                {/* Content Testing Section */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Split className="w-4 h-4 text-agency-accent" />
+                    <h4 className="text-[10px] font-black uppercase text-agency-ink tracking-widest">Content Testing Variation (A/B)</h4>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="p-5 border-2 border-dashed border-agency-border rounded-2xl space-y-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] font-black text-agency-ink uppercase">Variant A (Control)</span>
+                        <div className="w-2 h-2 rounded-full bg-blue-500" />
+                      </div>
+                      <textarea 
+                        placeholder="Primary creative hook..."
+                        className="w-full p-3 bg-agency-bg border border-agency-border rounded-xl text-xs font-medium h-24 outline-none resize-none"
+                      />
+                      <button className="w-full py-2 bg-white border border-agency-border rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-agency-bg transition-colors">
+                        Upload Asset
+                      </button>
+                    </div>
+                    <div className="p-5 border-2 border-dashed border-agency-accent/30 bg-agency-accent/5 rounded-2xl space-y-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] font-black text-agency-accent uppercase">Variant B (Exp)</span>
+                        <div className="w-2 h-2 rounded-full bg-agency-accent" />
+                      </div>
+                      <textarea 
+                        placeholder="Alternative hook / angle..."
+                        className="w-full p-3 bg-white border border-agency-accent/20 rounded-xl text-xs font-medium h-24 outline-none resize-none"
+                      />
+                      <button className="w-full py-2 bg-agency-accent text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:opacity-90 transition-opacity">
+                        Upload Asset
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-      </div>
+
+              <div className="p-8 bg-slate-50 border-t border-agency-border flex gap-4">
+                <button 
+                  onClick={() => setShowNewCampaignModal(false)}
+                  className="flex-1 py-4 bg-white border border-agency-border text-agency-ink rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-agency-bg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={() => {
+                    onAction('Deploying new campaign with A/B variant test...', 'success');
+                    setShowNewCampaignModal(false);
+                  }}
+                  className="flex-1 py-4 bg-agency-ink text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-agency-accent transition-all shadow-xl shadow-agency-ink/20"
+                >
+                  Confirm & Deploy
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
-  </div>
-);
+  );
 };
+
 
 const PillarView = ({ pillar, onAction }: { pillar: Pillar, onAction: (name: string, type?: string) => void }) => {
   const filteredCampaigns = CAMPAIGNS.filter(c => c.pillar === pillar);
@@ -9850,6 +11174,8 @@ export default function App() {
   const [emailSegments, setEmailSegments] = useState<EmailSegment[]>(EMAIL_SEGMENTS);
   const [workflows, setWorkflows] = useState<AutomationWorkflow[]>(AUTOMATION_WORKFLOWS);
   const [emailTemplates, setEmailTemplates] = useState<EmailTemplate[]>(EMAIL_TEMPLATES);
+  const [emailApprovals, setEmailApprovals] = useState<EmailApproval[]>([]);
+  const [isFetchingApprovals, setIsFetchingApprovals] = useState(false);
 
   // Workflow State & Identifiers (Steps 1-8)
   const [tenantId, setTenantId] = useState<string>('T-6671-X');
@@ -9858,6 +11184,40 @@ export default function App() {
   const [isMediaSyncing, setIsMediaSyncing] = useState(false);
   const [a2aStatus, setA2aStatus] = useState<A2ASystemStatusResponse | null>(null);
   const [cloudStatus, setCloudStatus] = useState<CloudStatusResponse | null>(null);
+
+  useEffect(() => {
+    fetchEmailApprovals();
+  }, [activeTab]);
+
+  const fetchEmailApprovals = async () => {
+    if (activeTab !== 'approvals' && activeTab !== 'email-dispatch') return;
+    setIsFetchingApprovals(true);
+    try {
+      const response = await fetch('/api/v1/email/approvals');
+      const data = await response.json();
+      if (data.approvals) setEmailApprovals(data.approvals);
+    } catch (error) {
+      console.error('Failed to fetch email approvals', error);
+    } finally {
+      setIsFetchingApprovals(false);
+    }
+  };
+
+  const handleHandleEmailApproval = async (id: string, action: 'approve' | 'reject') => {
+    addNotification(`Executing decision sequence for approval: ${id}...`, 'info');
+    try {
+      const response = await fetch(`/api/v1/email/approvals/${id}/action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action })
+      });
+      const data = await response.json();
+      addNotification(data.message, action === 'approve' ? 'success' : 'warning');
+      fetchEmailApprovals();
+    } catch (error) {
+      addNotification('Approval orchestration sequence failed.', 'error');
+    }
+  };
 
   const addNotification = (message: string, type: 'success' | 'info' | 'warning' | 'error' = 'info') => {
     const id = Math.random().toString(36).substring(7);
@@ -9926,7 +11286,7 @@ export default function App() {
     addNotification(`Ingesting multimodal asset: ${type} scan in progress...`, 'info');
     try {
       const formData = new FormData();
-      formData.append('media', file);
+      formData.append(type, file);
       formData.append('tenant_id', tenantId);
       formData.append('type', type);
 
@@ -10057,6 +11417,12 @@ export default function App() {
           tenantId={tenantId}
         />
       );
+      case 'pricing': return <PricingView onAction={addNotification} />;
+      case 'query-agent': return <QueryAgentView onAction={addNotification} tenantId={tenantId} />;
+      case 'email-dispatch': return <EmailDispatchView onAction={addNotification} />;
+      case 'email-approvals': return <EmailApprovalView approvals={emailApprovals} onAction={addNotification} onHandle={handleHandleEmailApproval} />;
+      case 'email-tracking': return <EmailTrackingView onAction={addNotification} />;
+      case 'email-audit': return <EmailAuditView onAction={addNotification} />;
       default: return <Overview onAction={addNotification} />;
     }
   };
@@ -10205,10 +11571,38 @@ export default function App() {
           
           <div className="pt-4 pb-2 px-4 text-[10px] font-bold uppercase tracking-widest text-white/40">Tenant Ops</div>
           <SidebarItem icon={Building2} label="Agency Config" active={activeTab === 'agency-config'} onClick={() => setActiveTab('agency-config')} />
+          <SidebarItem icon={Mail} label="Secure Dispatch" active={activeTab === 'email-dispatch'} onClick={() => setActiveTab('email-dispatch')} />
+          <SidebarItem icon={UserCheck} label="Email Approvals" active={activeTab === 'email-approvals'} onClick={() => setActiveTab('email-approvals')} />
+          <SidebarItem icon={BarChart3} label="Email Tracking" active={activeTab === 'email-tracking'} onClick={() => setActiveTab('email-tracking')} />
+          <SidebarItem icon={ClipboardList} label="Security Audit" active={activeTab === 'email-audit'} onClick={() => setActiveTab('email-audit')} />
+          <SidebarItem icon={PlusSquare} label="Query Agent" active={activeTab === 'query-agent'} onClick={() => setActiveTab('query-agent')} />
+          <SidebarItem icon={CreditCard} label="Billing & Tiers" active={activeTab === 'pricing'} onClick={() => setActiveTab('pricing')} />
           <SidebarItem icon={Settings} label="System Settings" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
         </nav>
 
-        <div className="p-4 border-t border-white/5 space-y-1">
+        <div className="p-4 border-t border-white/5 space-y-4">
+          {isSidebarOpen && (
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="p-5 bg-gradient-to-br from-agency-accent to-purple-600 rounded-[2rem] text-white space-y-3 shadow-xl shadow-agency-accent/20 border border-white/10"
+            >
+              <div className="p-2 bg-white/10 rounded-xl w-fit">
+                <Crown className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-sm font-black font-display tracking-tight leading-none mb-1">Scale Agency Ops</div>
+                <div className="text-[9px] font-bold text-white/70 uppercase tracking-widest leading-relaxed">Unlock L2 Auto-Fix & White-Label Dashboards</div>
+              </div>
+              <button 
+                onClick={() => setActiveTab('pricing')}
+                className="w-full py-3 bg-white text-agency-ink rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-agency-bg transition-colors shadow-lg"
+              >
+                Sign Up & Upgrade
+              </button>
+            </motion.div>
+          )}
+          
           <SidebarItem icon={Settings} label="Settings" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
           <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="sidebar-item w-full">
             <ChevronRight className={cn("w-5 h-5 transition-transform", isSidebarOpen && "rotate-180")} />
