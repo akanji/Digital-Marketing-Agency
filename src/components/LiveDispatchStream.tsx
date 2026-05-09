@@ -52,6 +52,12 @@ export const LiveDispatchStream = () => {
       case 'COMPLIANCE_RESULT': return 'text-cyan-400 border-cyan-800 bg-cyan-900/20';
       case 'MEDIA_SCAN_INITIATED': return 'text-amber-300 border-amber-900/50 bg-amber-500/5';
       case 'MEDIA_SCAN_COMPLETE': return 'text-amber-400 border-amber-800 bg-amber-900/20';
+      case 'CAMPAIGN_GEN_INITIATED': return 'text-purple-400 border-purple-900/50 bg-purple-500/5';
+      case 'CAMPAIGN_GEN_COMPLETE': return 'text-purple-400 border-purple-800 bg-purple-900/20';
+      case 'VOICE_CLONING_INITIATED': return 'text-pink-400 border-pink-900/50 bg-pink-500/5';
+      case 'VOICE_CLONING_COMPLETE': return 'text-pink-400 border-pink-800 bg-pink-900/20';
+      case 'VIDEO_SYNTHESIS_INITIATED': return 'text-indigo-400 border-indigo-900/50 bg-indigo-500/5';
+      case 'VIDEO_SYNTHESIS_COMPLETE': return 'text-indigo-400 border-indigo-800 bg-indigo-900/20';
       case 'PROTOCOL_UPDATED': return 'text-blue-300 border-blue-800 bg-blue-900/20';
       case 'SYSTEM_HANDSHAKE': return 'text-slate-500 border-slate-800 bg-slate-900/50';
       default: return 'text-slate-400 border-slate-800 bg-slate-900/50';
