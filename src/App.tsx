@@ -535,9 +535,12 @@ const PricingView = ({ onAction }: { onAction: (name: string, type?: string) => 
     setIsCreatingSession(plan.plan);
     onAction(`Initializing secure checkout protocol for ${plan.plan} tier...`, 'info');
 
+    // Map plan name to the literal type expected by CheckoutSessionRequest
+    const planType = plan.plan.toLowerCase() as 'trial' | 'monthly' | 'yearly';
+
     const requestBody: CheckoutSessionRequest = {
-      plan: plan.plan,
-      price: plan.price
+      plan_type: planType,
+      customer_email: 'phidephefem@gmail.com' // Using user email from context
     };
 
     try {
@@ -547,18 +550,24 @@ const PricingView = ({ onAction }: { onAction: (name: string, type?: string) => 
         body: JSON.stringify(requestBody)
       });
 
-      if (!response.ok) throw new Error('Checkout Handshake Failed');
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || 'Checkout Handshake Failed');
+      }
+      
       const result: CheckoutSessionResponse = await response.json();
       
       onAction(`Checkout session created. Redirecting to payment portal...`, 'success');
       
-      // Simulate redirection
-      setTimeout(() => {
-        window.open(result.url, '_blank');
-      }, 1000);
-    } catch (error) {
+      // Real redirection
+      if (result.url) {
+        window.location.href = result.url;
+      } else {
+        throw new Error('No URL returned from checkout session');
+      }
+    } catch (error: any) {
       console.error(error);
-      onAction('Billing orchestration module failed to create session.', 'error');
+      onAction(`Orchestration failed: ${error.message}`, 'error');
     } finally {
       setIsCreatingSession(null);
     }
@@ -571,7 +580,7 @@ const PricingView = ({ onAction }: { onAction: (name: string, type?: string) => 
         <p className="text-agency-muted font-bold uppercase tracking-widest text-xs">Unleash the full power of Gemini 2.0 Agentic Workflows & Multi-Tenant Orchestration</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 px-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 px-4 max-w-5xl mx-auto">
         {PRICING_PLANS.map((plan) => (
           <div 
             key={plan.plan} 
@@ -584,18 +593,18 @@ const PricingView = ({ onAction }: { onAction: (name: string, type?: string) => 
           >
             {plan.isPopular && (
               <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-agency-accent text-white text-[10px] font-black uppercase tracking-widest rounded-full shadow-lg">
-                Most Optimized
+                Most Popular
               </div>
             )}
 
             <div className="mb-8">
               <div className={cn("text-[10px] font-black uppercase tracking-[0.2em] mb-2", plan.isPopular ? "text-agency-accent" : "text-agency-muted")}>
-                {plan.plan} Tier
+                {plan.plan === 'Monthly' ? 'Growth Monthly' : 'Agency Yearly'}
               </div>
               <div className="flex items-baseline gap-1">
                 <span className="text-4xl font-black font-display tracking-tighter">{plan.price}</span>
                 <span className={cn("text-[10px] font-bold uppercase", plan.isPopular ? "text-white/40" : "text-agency-muted")}>
-                  {plan.plan === 'Yearly' ? '/year' : plan.plan === 'Trial' ? '/7d' : '/mo'}
+                  {plan.plan === 'Yearly' ? '/year' : '/mo'}
                 </span>
               </div>
               <div className={cn("mt-2 text-[11px] font-bold italic", plan.isPopular ? "text-slate-400" : "text-agency-muted")}>
@@ -620,7 +629,7 @@ const PricingView = ({ onAction }: { onAction: (name: string, type?: string) => 
               className={cn(
                 "w-full py-4 rounded-2xl text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2",
                 plan.isPopular 
-                  ? "bg-agency-accent text-white shadow-xl shadow-agency-accent/20 hover:scale-105 active:scale-95" 
+                  ? "bg-agency-accent text-white shadow-xl shadow-agency-accent/20 hover:scale-105 active:scale-95 text-white" 
                   : "bg-agency-ink text-white hover:bg-agency-accent"
               )}
             >
@@ -631,13 +640,19 @@ const PricingView = ({ onAction }: { onAction: (name: string, type?: string) => 
                 </>
               ) : (
                 <>
-                  {plan.plan === 'Trial' ? <Clock className="w-4 h-4" /> : <Zap className="w-4 h-4" />}
-                  {plan.plan === 'Trial' ? 'Start Free Sequence' : 'Acquire License'}
+                  <Rocket className="w-4 h-4" />
+                  Start Free Trial
                 </>
               )}
             </button>
           </div>
         ))}
+      </div>
+
+      <div className="text-center max-w-md mx-auto">
+        <p className="text-[10px] font-bold text-agency-muted uppercase tracking-widest leading-relaxed">
+          *Note: You will not be charged until the 7th day. Cancel anytime.*
+        </p>
       </div>
 
       <div className="max-w-4xl mx-auto p-12 bg-agency-bg border border-agency-border rounded-[3rem] text-center space-y-6">
@@ -6317,6 +6332,48 @@ const SocialMediaView = ({ onAction }: { onAction: (name: string, type?: string)
   ]);
   const [roasData, setRoasData] = useState({ adSpend: 42000, revenue: 176400, socialCommerceRevenue: 52000, status: 'STABLE' });
   const [showNewCampaignModal, setShowNewCampaignModal] = useState(false);
+  const [isRedirectingToCheckout, setIsRedirectingToCheckout] = useState(false);
+
+  // Deployment Agent: Monitor access rights. 
+  // Simulation: Checking if access is after Day 7 trial period.
+  useEffect(() => {
+    const checkAccessRights = async () => {
+      // Simulate checking if today is past the 7th day of the trial
+      // For demo purposes, we trigger this if a specific 'isSubscribed' flag is missing
+      const isSubscribed = localStorage.getItem('agency_subscribed') === 'true';
+      const trialStartDate = localStorage.getItem('agency_trial_start') || new Date().toISOString();
+      const daysSinceStart = Math.floor((new Date().getTime() - new Date(trialStartDate).getTime()) / (1000 * 60 * 60 * 24));
+
+      if (daysSinceStart > 7 && !isSubscribed) {
+        setIsRedirectingToCheckout(true);
+        onAction('Deployment Agent: Trial Period Expired (Day 8+). Initiating Auto-Fix Protocol...', 'warning');
+        
+        try {
+          const response = await fetch('/api/v1/checkout/create-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              plan_type: 'monthly',
+              customer_email: 'phidephefem@gmail.com'
+            })
+          });
+          
+          const result = await response.json();
+          if (result.url) {
+            onAction('Redirecting to secure payment portal to restore module access...', 'info');
+            setTimeout(() => {
+              window.location.href = result.url;
+            }, 2000);
+          }
+        } catch (error) {
+          onAction('Deployment Agent: Auto-Fix failed. Manual intervention required.', 'error');
+        }
+      }
+    };
+
+    checkAccessRights();
+  }, []);
+
   const [finishedCampaigns] = useState([
     { id: 'fc-1', name: 'Q1 Brand Awareness', finalRoas: 4.1, conversions: 1240, status: 'Completed', platform: 'Meta' },
     { id: 'fc-2', name: 'Legacy Retargeting', finalRoas: 6.8, conversions: 840, status: 'Completed', platform: 'LinkedIn' },
@@ -6388,7 +6445,31 @@ const SocialMediaView = ({ onAction }: { onAction: (name: string, type?: string)
   ];
 
   return (
-    <div className="space-y-8 animate-in slide-in-from-right-4 duration-500">
+    <div className="space-y-8 animate-in slide-in-from-right-4 duration-500 relative">
+      {isRedirectingToCheckout && (
+        <div className="absolute inset-0 z-[60] bg-white/80 backdrop-blur-md flex flex-col items-center justify-center text-center p-8 rounded-[3rem]">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="max-w-md space-y-6"
+          >
+            <div className="p-6 bg-red-500/10 rounded-full w-fit mx-auto">
+              <Lock className="w-12 h-12 text-red-600" />
+            </div>
+            <div>
+              <h2 className="text-3xl font-black font-display uppercase tracking-tight text-agency-ink">Access Restricted</h2>
+              <p className="text-xs font-bold text-agency-muted uppercase tracking-widest mt-2">Trial Period Expired (Day 8+)</p>
+            </div>
+            <p className="text-sm font-medium text-slate-600 leading-relaxed">
+              Your 7-day free trial of the Social Media module has concluded. We are automatically preparing a secure checkout session to restore your access.
+            </p>
+            <div className="flex items-center justify-center gap-3 py-4">
+              <RefreshCw className="w-5 h-5 text-agency-accent animate-spin" />
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-agency-accent">Auto-Fix Deploying...</span>
+            </div>
+          </motion.div>
+        </div>
+      )}
       {/* Header & Global Controls */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-[2rem] border border-agency-border shadow-sm">
         <div>

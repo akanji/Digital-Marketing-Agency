@@ -108,26 +108,19 @@ export const SUBSCRIPTION_TIERS: SubscriptionTier[] = [
 
 export const PRICING_PLANS: PricingPlan[] = [
   {
-    plan: 'Trial',
-    price: '$0.00',
-    logicGate: '7-Day Access',
-    action: 'POST /api/v1/checkout/create-session?price=trial',
-    features: ['Standard CRM Sync', 'Reputation Monitoring', 'Self-Healing Protocol (L1)']
-  },
-  {
     plan: 'Monthly',
     price: '$19.99',
-    logicGate: 'Recurring',
-    action: 'POST /api/v1/checkout/create-session?price=monthly',
-    features: ['All Trial Features', 'Advanced Deliverability', 'Gemini 2.0 Auto-Fix (L2)', 'Custom Webhooks'],
+    logicGate: '7-Day Free Trial',
+    action: 'button_trigger_monthly',
+    features: ['Full Analytics', 'Social Media Agent', 'Gemini 2.0 Auto-Fix (L2)', 'Deliverability Guard'],
     isPopular: true
   },
   {
     plan: 'Yearly',
     price: '$199.99',
-    logicGate: 'Recurring (Save 16%)',
-    action: 'POST /api/v1/checkout/create-session?price=yearly',
-    features: ['All Pro Features', 'Dedicated Shard Management', 'White-Label Dashboards', 'Priority Support']
+    logicGate: '7-Day Free Trial (2 Months Free)',
+    action: 'button_trigger_yearly',
+    features: ['All Monthly Features', 'White-Label Dashboards', 'Priority Support', 'Annual License Discount']
   }
 ];
 

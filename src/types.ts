@@ -1407,8 +1407,8 @@ export interface PricingPlan {
 }
 
 export interface CheckoutSessionRequest {
-  plan: string;
-  price: string;
+  plan_type: 'trial' | 'monthly' | 'yearly';
+  customer_email?: string;
 }
 
 export interface CheckoutSessionResponse {
