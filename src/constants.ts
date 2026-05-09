@@ -108,7 +108,7 @@ export const SUBSCRIPTION_TIERS: SubscriptionTier[] = [
 
 export const PRICING_PLANS: PricingPlan[] = [
   {
-    plan: 'Monthly',
+    plan: 'Growth Monthly',
     price: '$19.99',
     logicGate: '7-Day Free Trial',
     action: 'button_trigger_monthly',
@@ -116,7 +116,7 @@ export const PRICING_PLANS: PricingPlan[] = [
     isPopular: true
   },
   {
-    plan: 'Yearly',
+    plan: 'Agency Yearly',
     price: '$199.99',
     logicGate: '7-Day Free Trial (2 Months Free)',
     action: 'button_trigger_yearly',
