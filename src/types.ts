@@ -561,6 +561,7 @@ export interface SecureSendRequest {
   encryption: 'TLS 1.3' | 'S/MIME' | 'PGP';
   compliance: ComplianceShield;
   mfa_token?: string;
+  scheduled_at?: string;
 }
 
 export interface SecureSendResponse {
@@ -577,7 +578,7 @@ export interface EmailDispatchLog {
   to: string;
   subject: string;
   type: EmailType;
-  status: 'sent' | 'failed' | 'processing' | 'delivered' | 'bounced';
+  status: 'sent' | 'failed' | 'processing' | 'delivered' | 'bounced' | 'cancelled' | 'scheduled';
   security_level: string;
   timestamp: string;
   open_count?: number;
@@ -622,6 +623,26 @@ export interface EmailApproval {
   compliance_flags: string[];
   timestamp: string;
   body_preview: string;
+}
+
+export interface SecureDispatchSettings {
+  approvalThreshold: number;
+  encryptionRequired: boolean;
+  autoSanitize: boolean;
+  highRiskTypes: EmailType[];
+  dailyLimit: number;
+  mfaEnabled: boolean;
+  defaultCompliance: ComplianceShield;
+}
+
+export interface MediaComplianceReport {
+  isCompliant: boolean;
+  score: number;
+  violations: string[];
+  suggestions: string[];
+  brandAlignment: string;
+  detectedColors: string[];
+  safeForWork: boolean;
 }
 
 export interface Persona {
