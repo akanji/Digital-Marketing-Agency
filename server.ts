@@ -7,6 +7,8 @@ import Stripe from 'stripe';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
+import cors from 'cors';
+import 'dotenv/config';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -75,7 +77,46 @@ async function startServer() {
     }
   });
 
+  // --- STRIPE WEBHOOKS & MONITORING ---
+  // Webhook MUST be before express.json() to get raw body for signature verification
+  app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+    const stripe = getStripe();
+    const sig = req.headers['stripe-signature'];
+    const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+    let event;
+
+    try {
+      if (endpointSecret && sig) {
+        event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
+      } else {
+        event = JSON.parse(req.body);
+      }
+    } catch (err: any) {
+      console.error(`[Deployment Agent] Webhook Signature Verification Failed: ${err.message}`);
+      res.status(400).send(`Webhook Error: ${err.message}`);
+      return;
+    }
+
+    // Handle specific events:
+    if (event.type === 'customer.subscription.deleted') {
+      const subscription = event.data.object as any;
+      console.log(`[Deployment Agent] Subscription deleted: ${subscription.id}`);
+    } else if (event.type === 'customer.subscription.updated') {
+      const subscription = event.data.object as any;
+      console.log(`[Deployment Agent] Subscription updated: ${subscription.id} - status: ${subscription.status}`);
+    } else if (event.type === 'invoice.payment_succeeded') {
+      const invoice = event.data.object as any;
+      console.log(`[Deployment Agent] Payment succeeded for invoice: ${invoice.id}`);
+    }
+
+    res.json({ received: true });
+  });
+
+  app.post('/api/webhooks/stripe', (req, res) => res.redirect(307, '/webhook'));
+
   app.use(express.json());
+  app.use(cors());
 
   // --- HEALTH & MAINTENANCE AGENT ---
   app.get('/api/health', (req, res) => {
@@ -1582,37 +1623,38 @@ async function startServer() {
     }
   });
 
-  // --- STRIPE WEBHOOKS & MONITORING ---
-
-  app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
-    const stripe = getStripe();
-    const sig = req.headers['stripe-signature'];
-    const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
-
-    let event;
-
+  // API Endpoint to Create a Checkout Session (Alias for snippet compatibility)
+  app.post('/create-checkout-session', async (req, res) => {
     try {
-      if (endpointSecret && sig) {
-        event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
-      } else {
-        // Fallback for demo/development if secret is missing
-        event = JSON.parse(req.body);
-      }
-    } catch (err: any) {
-      console.error(`[Deployment Agent] Webhook Signature Verification Failed: ${err.message}`);
-      res.status(400).send(`Webhook Error: ${err.message}`);
-      return;
-    }
+      const { priceId, customer_email } = req.body;
+      const stripe = getStripe();
+      const YOUR_DOMAIN = process.env.APP_URL || 'http://localhost:3000';
 
-    // Handle the specific event: customer.subscription.deleted
-    if (event.type === 'customer.subscription.deleted') {
-      const subscription = event.data.object;
-      console.log(`[Deployment Agent] Subscription deleted: ${subscription.id} for customer ${subscription.customer}`);
-      // Logic for revocation of access goes here
-    }
+      const session = await stripe.checkout.sessions.create({
+        customer_email: customer_email || undefined,
+        line_items: [
+          {
+            price: priceId, 
+            quantity: 1,
+          },
+        ],
+        mode: 'subscription',
+        subscription_data: {
+          trial_period_days: 7,
+        },
+        success_url: `${YOUR_DOMAIN}?success=true&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${YOUR_DOMAIN}?canceled=true`,
+        allow_promotion_codes: true,
+      });
 
-    res.json({ received: true });
+      res.status(200).json({ url: session.url });
+    } catch (error: any) {
+      console.error('Error creating checkout session:', error);
+      res.status(500).json({ error: error.message });
+    }
   });
+
+  // (Webhook moved to start of integration section before express.json())
 
   // --- AUTO-FIX: PRICE ID INTEGRITY AUDIT ---
   const VALID_PRICE_IDS = {
@@ -1644,18 +1686,15 @@ async function startServer() {
   // --- BILLING & CHECKOUT ENDPOINTS ---
 
   app.post('/api/v1/checkout/create-session', async (req, res) => {
-    const { plan_type, customer_email } = req.body;
+    const { plan_type, customer_email, priceId } = req.body;
     
-    if (!plan_type) {
-      return res.status(400).json({ error: 'Missing plan_type' });
-    }
-
     const price_ids: Record<string, string> = VALID_PRICE_IDS;
 
     try {
       const stripe = getStripe();
+      const YOUR_DOMAIN = process.env.APP_URL || 'http://localhost:3000';
       
-      const selectedPriceId = price_ids[plan_type] || price_ids['monthly'];
+      const selectedPriceId = priceId || price_ids[plan_type] || price_ids['monthly'];
 
       const session = await stripe.checkout.sessions.create({
         customer_email: customer_email || undefined,
@@ -1668,8 +1707,9 @@ async function startServer() {
         subscription_data: {
           trial_period_days: 7,
         },
-        success_url: `${process.env.APP_URL || 'http://localhost:3000'}/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${process.env.APP_URL || 'http://localhost:3000'}/cancel`,
+        allow_promotion_codes: true,
+        success_url: `${YOUR_DOMAIN}?success=true&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${YOUR_DOMAIN}?canceled=true`,
       });
 
       res.json({ sessionId: session.id, url: session.url });

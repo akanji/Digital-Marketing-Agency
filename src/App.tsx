@@ -564,16 +564,13 @@ const PricingView = ({ onAction }: { onAction: (name: string, type?: string) => 
     setIsCreatingSession(plan.plan);
     onAction(`Initializing secure checkout protocol for ${plan.plan} tier...`, 'info');
 
-    // Map plan name to the literal type expected by CheckoutSessionRequest
-    const planType = plan.plan.toLowerCase() as 'trial' | 'monthly' | 'yearly';
-
-    const requestBody: CheckoutSessionRequest = {
-      plan_type: planType,
-      customer_email: 'phidephefem@gmail.com' // Using user email from context
+    const requestBody = {
+      priceId: plan.plan === 'Yearly' ? 'price_1TUy7oBMbxh6jv0CwMdQOBII' : 'price_1TUy6KBMbxh6jv0CSQvph3ev',
+      customer_email: 'phidephefem@gmail.com'
     };
 
     try {
-      const response = await fetch('/api/v1/checkout/create-session', {
+      const response = await fetch('/create-checkout-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody)
@@ -5750,10 +5747,13 @@ const SocialMediaView = ({ onAction }: { onAction: (name: string, type?: string)
   // Simulation: Checking if access is after Day 7 trial period.
   useEffect(() => {
     const checkAccessRights = async () => {
-      // Simulate checking if today is past the 7th day of the trial
-      // For demo purposes, we trigger this if a specific 'isSubscribed' flag is missing
+      // Initialize trial start if not present
+      if (!localStorage.getItem('agency_trial_start')) {
+        localStorage.setItem('agency_trial_start', new Date().toISOString());
+      }
+
       const isSubscribed = localStorage.getItem('agency_subscribed') === 'true';
-      const trialStartDate = localStorage.getItem('agency_trial_start') || new Date().toISOString();
+      const trialStartDate = localStorage.getItem('agency_trial_start')!;
       const daysSinceStart = Math.floor((new Date().getTime() - new Date(trialStartDate).getTime()) / (1000 * 60 * 60 * 24));
 
       if (daysSinceStart > 7 && !isSubscribed) {
@@ -5761,11 +5761,11 @@ const SocialMediaView = ({ onAction }: { onAction: (name: string, type?: string)
         onAction('Deployment Agent: Trial Period Expired (Day 8+). Initiating Auto-Fix Protocol...', 'warning');
         
         try {
-          const response = await fetch('/api/v1/checkout/create-session', {
+          const response = await fetch('/create-checkout-session', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
-              plan_type: 'monthly',
+              priceId: 'price_1TUy6KBMbxh6jv0CSQvph3ev',
               customer_email: 'phidephefem@gmail.com'
             })
           });
@@ -10681,6 +10681,18 @@ export default function App() {
 
   useEffect(() => {
     fetchEmailApprovals();
+
+    // --- STRIPE CHECKOUT HANDLER ---
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('success')) {
+      addNotification('Subscription active! Access to the Digital Marketing Agency app has been granted.', 'success');
+      localStorage.setItem('agency_subscribed', 'true');
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (urlParams.get('canceled')) {
+      addNotification('Subscription payment was canceled. Trial limits still apply.', 'warning');
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
   }, [activeTab]);
 
   const fetchEmailApprovals = async () => {
