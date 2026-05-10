@@ -99,7 +99,10 @@ async function startServer() {
     }
 
     // Handle specific events:
-    if (event.type === 'customer.subscription.deleted') {
+    if (event.type === 'customer.subscription.created') {
+      const subscription = event.data.object as any;
+      console.log(`[Deployment Agent] Subscription created: ${subscription.id} (Trial until: ${subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : 'Never'})`);
+    } else if (event.type === 'customer.subscription.deleted') {
       const subscription = event.data.object as any;
       console.log(`[Deployment Agent] Subscription deleted: ${subscription.id}`);
     } else if (event.type === 'customer.subscription.updated') {
@@ -108,12 +111,49 @@ async function startServer() {
     } else if (event.type === 'invoice.payment_succeeded') {
       const invoice = event.data.object as any;
       console.log(`[Deployment Agent] Payment succeeded for invoice: ${invoice.id}`);
+    } else if (event.type === 'invoice.payment_failed') {
+      const invoice = event.data.object as any;
+      console.log(`[Deployment Agent] Payment failed for invoice: ${invoice.id}`);
     }
 
     res.json({ received: true });
   });
 
   app.post('/api/webhooks/stripe', (req, res) => res.redirect(307, '/webhook'));
+
+  app.post('/create-checkout-session', express.json(), async (req, res) => {
+    try {
+      const stripe = getStripe();
+      const { priceId, isTrial } = req.body;
+      const domain = process.env.APP_URL || 'http://localhost:3000';
+
+      const sessionConfig: Stripe.Checkout.SessionCreateParams = {
+        line_items: [
+          {
+            price: priceId,
+            quantity: 1,
+          },
+        ],
+        mode: 'subscription',
+        success_url: `${domain}?subscription=success`,
+        cancel_url: `${domain}?subscription=canceled`,
+        allow_promotion_codes: true,
+      };
+
+      // If isTrial is requested, add 7 days trial period
+      if (isTrial) {
+        sessionConfig.subscription_data = {
+          trial_period_days: 7,
+        };
+      }
+
+      const session = await stripe.checkout.sessions.create(sessionConfig);
+      res.status(200).json({ url: session.url });
+    } catch (error: any) {
+      console.error('[Deployment Agent] Error creating checkout session:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
 
   app.use(express.json());
   app.use(cors());
@@ -1182,7 +1222,7 @@ async function startServer() {
   ];
 
   app.post('/api/v1/email/dispatch', async (req, res) => {
-    const { to, subject, encryption, compliance, body, type, scheduled_at } = req.body;
+    const { to, subject, encryption, compliance, body, type, scheduled_at, replyTo, isForward } = req.body;
 
     if (!to || !subject) {
       return res.status(400).json({ error: 'Recipient and subject required' });
@@ -1194,10 +1234,10 @@ async function startServer() {
       return res.status(403).json({ error: 'Secure Dispatch requires an active $19.99/Monthly or $199.99/Yearly plan.' });
     }
 
-    console.log(`[Email Agent] Dispatching secure ${type} email to: ${to} via ${encryption}${scheduled_at ? ` scheduled for ${scheduled_at}` : ''}`);
+    console.log(`[Email Agent] Dispatching secure ${type} email to: ${to} (Reply-To: ${replyTo || 'default'}) via ${encryption}${scheduled_at ? ` scheduled for ${scheduled_at}` : ''}${isForward ? ' [FORWARD]' : ''}`);
 
     try {
-      emitDispatchEvent('DISPATCH_INITIATED', { to, subject, type });
+      emitDispatchEvent('DISPATCH_INITIATED', { to, subject, type, replyTo, isForward });
       
       // Risk Assessment: Identify if email needs manual approval
       const needsApproval = secureDispatchSettings.highRiskTypes.includes(type) || body.length > secureDispatchSettings.approvalThreshold;
@@ -1471,6 +1511,34 @@ async function startServer() {
       res.json({ sanitized: sanitizedBody });
     } catch (error) {
       res.status(500).json({ error: 'Sanitization engine fault' });
+    }
+  });
+
+  app.post('/api/v1/email/suggest-subjects', async (req, res) => {
+    const { body, segment, mood } = req.body;
+    if (!body) return res.status(400).json({ error: 'Body required for subject generation' });
+
+    try {
+      const prompt = `You are an Email Marketing Specialist. Based on the following email body, target segment, and intended mood, suggest 3 highly optimized subject lines that will improve open rates. 
+      Ensure they are engaging, compliant, and fit the brand tone.
+      
+      Target Segment: ${segment || 'General Audience'}
+      Intended Mood: ${mood || 'Professional'}
+      Email Body: "${body}"
+      
+      Return a JSON array of strings: ["Subject 1", "Subject 2", "Subject 3"]. Return ONLY the JSON array.`;
+
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+      const result = await model.generateContent(prompt);
+      const responseText = result.response.text().trim();
+      
+      const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+      const suggestions = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
+      
+      res.json({ suggestions });
+    } catch (error) {
+      console.error('[Subject Suggester] Error:', error);
+      res.status(500).json({ error: 'Subject suggestion engine fault' });
     }
   });
 

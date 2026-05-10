@@ -563,6 +563,8 @@ export interface SecureSendRequest {
   mfa_token?: string;
   scheduled_at?: string;
   useSignature?: boolean;
+  replyTo?: string;
+  isForward?: boolean;
 }
 
 export interface SecureSendResponse {

@@ -22,7 +22,10 @@ import {
   Save,
   Book,
   PenTool,
-  Trash2
+  Trash2,
+  Sparkles,
+  Reply,
+  CornerUpRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../../lib/utils';
@@ -33,7 +36,23 @@ import {
   ComplianceShield 
 } from '../../types';
 
-const SecureEmailCompose = ({ formData, setFormData, onValidate, onSend, onSanitize, onPreview, isSending, isSanitizing, isPreviewing, isValidating }: any) => {
+const SecureEmailCompose = ({ 
+  formData, 
+  setFormData, 
+  onValidate, 
+  onSend, 
+  onSanitize, 
+  onPreview, 
+  onSuggestSubject,
+  isSending, 
+  isSanitizing, 
+  isPreviewing, 
+  isValidating,
+  isSuggestingSubject,
+  subjectSuggestions,
+  subjectMood,
+  setSubjectMood
+}: any) => {
   return (
     <div className="lg:col-span-2 space-y-6">
       <div className="panel-card p-8 space-y-6 bg-white rounded-[2rem] border border-slate-200 shadow-sm relative overflow-hidden group">
@@ -70,15 +89,119 @@ const SecureEmailCompose = ({ formData, setFormData, onValidate, onSend, onSanit
             </div>
           </div>
 
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest block pl-1">Reply-To Address (Optional)</label>
+              <div className="relative">
+                <input 
+                  type="text" 
+                  value={formData.replyTo || ''}
+                  onChange={(e) => setFormData((prev: any) => ({ ...prev, replyTo: e.target.value }))}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 pl-11 text-xs font-bold focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all outline-none"
+                  placeholder="reply@agency.com"
+                />
+                <Reply className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest block pl-1">Dispatch Mode</label>
+              <button 
+                onClick={() => setFormData((prev: any) => ({ ...prev, isForward: !prev.isForward }))}
+                className={cn(
+                  "w-full p-4 rounded-2xl border text-xs font-bold transition-all flex items-center justify-center gap-3",
+                  formData.isForward ? "bg-amber-50 border-amber-200 text-amber-700 shadow-sm" : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100"
+                )}
+              >
+                <CornerUpRight className={cn("w-4 h-4 transition-transform", formData.isForward ? "scale-110" : "scale-100")} />
+                {formData.isForward ? 'Forwarding Protocol Active' : 'Standard Direct Dispatch'}
+              </button>
+            </div>
+          </div>
+
           <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest block pl-1">Secure Subject</label>
-            <input 
-              type="text" 
-              value={formData.subject}
-              onChange={(e) => setFormData((prev: any) => ({ ...prev, subject: e.target.value }))}
-              className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs font-bold focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all outline-none"
-              placeholder="e.g., [CONFIDENTIAL] - Financial Statement Revision"
-            />
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 px-1 mb-1">
+              <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest block pl-1">Secure Subject</label>
+              <div className="flex items-center gap-2">
+                <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+                  {(['Professional', 'Urgent', 'Friendly'] as const).map((mood) => (
+                    <button
+                      key={mood}
+                      onClick={() => setSubjectMood(mood)}
+                      className={cn(
+                        "px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all",
+                        subjectMood === mood 
+                          ? "bg-white text-blue-600 shadow-sm border border-blue-100" 
+                          : "text-slate-400 hover:text-slate-600"
+                      )}
+                    >
+                      {mood}
+                    </button>
+                  ))}
+                </div>
+                <button 
+                  onClick={onSuggestSubject}
+                  disabled={isSuggestingSubject || !formData.body}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1.5 transition-all shadow-md shadow-blue-500/20 group"
+                >
+                  {isSuggestingSubject ? (
+                    <RefreshCw className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-3 h-3 group-hover:rotate-12 transition-transform" />
+                  )}
+                  Optimise
+                </button>
+              </div>
+            </div>
+            <div className="relative group/subject">
+              <input 
+                type="text" 
+                value={formData.subject}
+                onChange={(e) => setFormData((prev: any) => ({ ...prev, subject: e.target.value }))}
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs font-bold focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all outline-none"
+                placeholder="e.g., [CONFIDENTIAL] - Financial Statement Revision"
+              />
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover/subject:opacity-100 transition-opacity">
+                 <PenTool className="w-4 h-4 text-slate-300" />
+              </div>
+            </div>
+            
+            <AnimatePresence>
+              {subjectSuggestions && subjectSuggestions.length > 0 && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="mt-3 overflow-hidden"
+                >
+                  <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-[1.5rem] space-y-3 shadow-inner relative">
+                    <div className="absolute top-2 right-2 p-1 bg-white rounded-lg shadow-sm">
+                      <Sparkles className="w-3 h-3 text-blue-500" />
+                    </div>
+                    <p className="text-[9px] font-black uppercase tracking-widest text-blue-600 mb-1 pl-1 flex items-center gap-2">
+                       Neural Suggestion Engine <span className="h-px bg-blue-200 flex-1" />
+                    </p>
+                    <div className="grid grid-cols-1 gap-2">
+                      {subjectSuggestions.map((suggestion: string, idx: number) => (
+                        <button 
+                          key={idx}
+                          onClick={() => {
+                            setFormData((prev: any) => ({ ...prev, subject: suggestion }));
+                            onSuggestSubject && (onSuggestSubject as any).onHideSuggetions && (onSuggestSubject as any).onHideSuggetions();
+                          }}
+                          className="text-left p-3.5 bg-white border border-blue-100 rounded-xl text-[10px] font-bold text-slate-700 hover:border-blue-400 hover:shadow-md hover:-translate-y-0.5 transition-all flex items-center justify-between group/suggest"
+                        >
+                          <span className="truncate flex-1 mr-4">{suggestion}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[8px] font-black uppercase text-blue-400 opacity-0 group-hover/suggest:opacity-100 transition-all">Select</span>
+                            <ArrowRight className="w-3.5 h-3.5 text-blue-500 opacity-0 group-hover/suggest:opacity-100 transition-all translate-x-[-4px] group-hover/suggest:translate-x-0" />
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           <div className="space-y-2">
@@ -452,6 +575,9 @@ export default function SecureDispatch({ onAction }: { onAction: (msg: string, t
   const [summaryMetrics, setSummaryMetrics] = useState<{total_sent: number, delivery_rate: number} | null>(null);
   const [templates, setTemplates] = useState<any[]>([]);
   const [globalSignature, setGlobalSignature] = useState('');
+  const [isSuggestingSubject, setIsSuggestingSubject] = useState(false);
+  const [subjectSuggestions, setSubjectSuggestions] = useState<string[]>([]);
+  const [subjectMood, setSubjectMood] = useState<'Professional' | 'Urgent' | 'Friendly'>('Professional');
 
   useEffect(() => {
     const runDiagnostic = async () => {
@@ -620,6 +746,34 @@ export default function SecureDispatch({ onAction }: { onAction: (msg: string, t
     }
   };
 
+  const handleSuggestSubject = async () => {
+    if (!formData.body) {
+      onAction('Subject intelligence requires message body.', 'warning');
+      return;
+    }
+    setIsSuggestingSubject(true);
+    setSubjectSuggestions([]);
+    onAction('Querying neural marketing models...', 'info');
+    try {
+      const response = await fetch('/api/v1/email/suggest-subjects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body: formData.body, type: formData.type, mood: subjectMood, segment: formData.type })
+      });
+      const data = await response.json();
+      if (data.suggestions) {
+        setSubjectSuggestions(data.suggestions);
+        onAction('Subject line optimizations derived.', 'success');
+      } else {
+        onAction(data.error || 'Optimization failed.', 'error');
+      }
+    } catch (error) {
+      onAction('Optimization engine unreachable.', 'error');
+    } finally {
+      setIsSuggestingSubject(false);
+    }
+  };
+
   const handleSend = async () => {
     setIsSending(true);
     onAction('Initializing dispatch sequence...', 'info');
@@ -648,16 +802,19 @@ export default function SecureDispatch({ onAction }: { onAction: (msg: string, t
           total_sent: metricsData.total_sent,
           delivery_rate: metricsData.delivery_rate
         });
-        setFormData({ to: [''], subject: '', body: '', type: 'transactional', encryption: 'TLS 1.3', compliance: { gdpr: true, ccpa: true, can_spam: true } });
+        setFormData({ to: [''], subject: '', body: '', type: 'transactional', encryption: 'TLS 1.3', compliance: { gdpr: true, ccpa: true, can_spam: true }, replyTo: '', isForward: false });
         setValidationStatus(null);
+        setSubjectSuggestions([]);
       } else if (data.status === 'scheduled') {
         onAction(data.message, 'success');
-        setFormData({ to: [''], subject: '', body: '', type: 'transactional', encryption: 'TLS 1.3', compliance: { gdpr: true, ccpa: true, can_spam: true } });
+        setFormData({ to: [''], subject: '', body: '', type: 'transactional', encryption: 'TLS 1.3', compliance: { gdpr: true, ccpa: true, can_spam: true }, replyTo: '', isForward: false });
         setValidationStatus(null);
+        setSubjectSuggestions([]);
       } else if (data.status === 'pending_approval') {
         onAction(data.message, 'warning');
-        setFormData({ to: [''], subject: '', body: '', type: 'transactional', encryption: 'TLS 1.3', compliance: { gdpr: true, ccpa: true, can_spam: true } });
+        setFormData({ to: [''], subject: '', body: '', type: 'transactional', encryption: 'TLS 1.3', compliance: { gdpr: true, ccpa: true, can_spam: true }, replyTo: '', isForward: false });
         setValidationStatus(null);
+        setSubjectSuggestions([]);
       } else {
         onAction(data.error || 'Dispatch failed.', 'error');
       }
@@ -745,10 +902,15 @@ export default function SecureDispatch({ onAction }: { onAction: (msg: string, t
           onSanitize={handleSanitize}
           onPreview={handlePreview}
           onSend={handleSend}
+          onSuggestSubject={handleSuggestSubject}
           isSending={isSending}
           isSanitizing={isSanitizing}
           isPreviewing={isPreviewing}
           isValidating={isValidating}
+          isSuggestingSubject={isSuggestingSubject}
+          subjectSuggestions={subjectSuggestions}
+          subjectMood={subjectMood}
+          setSubjectMood={setSubjectMood}
         />
         <div className="space-y-6 text-left">
           <TemplateManager 
@@ -758,6 +920,7 @@ export default function SecureDispatch({ onAction }: { onAction: (msg: string, t
             onDelete={handleDeleteTemplate}
             onAction={onAction}
           />
+          <MediaComplianceScanner onAction={onAction} />
           <LiveDispatchStream />
           <div className="panel-card p-6 bg-white rounded-[2rem] border border-slate-200">
             <div className="flex items-center justify-between mb-4">

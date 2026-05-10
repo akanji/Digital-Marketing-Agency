@@ -115,7 +115,8 @@ import {
   Split,
   LineChart,
   UserPlus,
-  Phone
+  Phone,
+  LogOut
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -7514,6 +7515,56 @@ const CollaborationView = ({
             </div>
           </div>
 
+          <div className="panel-card p-6 bg-white border border-agency-border">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h3 className="font-bold text-lg font-display text-agency-ink">Team Management</h3>
+                <p className="text-[10px] font-bold text-agency-muted uppercase tracking-widest mt-0.5">Intelligence Entity Permissions</p>
+              </div>
+              <button 
+                onClick={onAddTeam}
+                className="p-2 bg-agency-accent text-white rounded-lg hover:scale-105 transition-transform"
+              >
+                <PlusSquare className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {teamMembers.map((member) => (
+                <div key={member.id} className="p-4 bg-agency-bg rounded-2xl border border-agency-border group hover:border-agency-accent transition-all flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-white border border-agency-border overflow-hidden">
+                      <img src={member.avatar} alt="" className="w-full h-full object-cover" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-agency-ink">{member.name}</span>
+                        <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", member.status === 'online' ? 'bg-emerald-500' : 'bg-slate-400')} />
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[9px] font-black uppercase tracking-widest text-agency-accent border border-agency-accent/20 px-1.5 py-0.5 rounded bg-agency-accent/5">{member.role}</span>
+                        <span className="text-[8px] font-bold text-agency-muted uppercase">Last seen: {member.lastActive.includes('Z') ? new Date(member.lastActive).toLocaleTimeString() : member.lastActive}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button 
+                      onClick={() => onEditTeam(member)}
+                      className="p-1.5 hover:bg-white rounded-lg text-agency-muted hover:text-agency-accent transition-colors"
+                    >
+                      <Settings className="w-3.5 h-3.5" />
+                    </button>
+                    <button 
+                      onClick={() => onDeleteTeam(member.id)}
+                      className="p-1.5 hover:bg-red-50 rounded-lg text-agency-muted hover:text-red-500 transition-colors"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div className="panel-card p-6 bg-slate-900 border-slate-800 text-white">
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-3">
@@ -10299,7 +10350,7 @@ const ClientsView = ({
 const UserSubscriptionView = ({ onAction }: { onAction: (name: string, type?: string) => void }) => {
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
 
-  const handleSubscriptionFlow = async (priceId: string, planName: string) => {
+  const handleSubscriptionFlow = async (priceId: string, planName: string, isTrial: boolean = false) => {
     setIsProcessing(planName);
     onAction(`Initializing secure checkout protocol for ${planName} tier...`, 'info');
 
@@ -10309,7 +10360,8 @@ const UserSubscriptionView = ({ onAction }: { onAction: (name: string, type?: st
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           priceId,
-          customer_email: 'phidephefem@gmail.com'
+          isTrial,
+          customer_email: 'phidephefem@gmail.com' // Should ideally come from auth
         })
       });
 
@@ -10317,11 +10369,11 @@ const UserSubscriptionView = ({ onAction }: { onAction: (name: string, type?: st
       if (data.url) {
         window.location.href = data.url;
       } else {
-        throw new Error('No checkout URL returned');
+        throw new Error(data.error || 'No checkout URL returned');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      onAction('Subscription sequence failed. Please check network connectivity.', 'error');
+      onAction(`Subscription sequence failed: ${error.message || 'Check network connectivity.'}`, 'error');
     } finally {
       setIsProcessing(null);
     }
@@ -10357,7 +10409,7 @@ const UserSubscriptionView = ({ onAction }: { onAction: (name: string, type?: st
               ))}
             </ul>
             <button 
-              onClick={() => handleSubscriptionFlow('price_1TUy6KBMbxh6jv0CSQvph3ev', 'Free Trial')}
+              onClick={() => handleSubscriptionFlow('price_1TUy6KBMbxh6jv0CSQvph3ev', 'Free Trial', true)}
               disabled={isProcessing !== null}
               className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black uppercase tracking-widest transition-all disabled:opacity-50 shadow-lg shadow-emerald-200"
             >
@@ -10753,6 +10805,7 @@ export default function App() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [clients, setClients] = useState<Client[]>(CLIENTS);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>(TEAM_MEMBERS);
+  const [currentUser, setCurrentUser] = useState<TeamMember>(TEAM_MEMBERS[0]);
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
@@ -10926,6 +10979,10 @@ export default function App() {
   };
 
   const handleDeleteClient = (id: string) => {
+    if (currentUser.role !== 'Admin') {
+      addNotification('Permission Denied: Only Admins can purge client shards', 'error');
+      return;
+    }
     setClients(prev => prev.filter(c => c.id !== id));
     addNotification('Client record purged from neural storage', 'warning');
   };
@@ -10943,16 +11000,28 @@ export default function App() {
   };
 
   const handleAddTeam = () => {
+    if (currentUser.role !== 'Admin') {
+      addNotification('Permission Denied: Team management requires Admin clearance', 'error');
+      return;
+    }
     setEditingTeamMember(null);
     setIsTeamModalOpen(true);
   };
 
   const handleEditTeam = (tm: TeamMember) => {
+    if (currentUser.role !== 'Admin' && currentUser.id !== tm.id) {
+      addNotification('Permission Denied: You can only calibrate your own intelligence vector', 'error');
+      return;
+    }
     setEditingTeamMember(tm);
     setIsTeamModalOpen(true);
   };
 
   const handleDeleteTeam = (id: string) => {
+    if (currentUser.role !== 'Admin') {
+      addNotification('Permission Denied: Only Admins can revoke team access', 'error');
+      return;
+    }
     setTeamMembers(prev => prev.filter(tm => tm.id !== id));
     addNotification('Team member access revoked', 'warning');
   };
@@ -11184,15 +11253,19 @@ export default function App() {
           <SidebarItem icon={UserCircle} label="System Personas" active={activeTab === 'personas'} onClick={() => setActiveTab('personas')} />
           <SidebarItem icon={Users2} label="Collaboration" active={activeTab === 'collaboration'} onClick={() => setActiveTab('collaboration')} />
           
-          <div className="pt-4 pb-2 px-4 text-[10px] font-bold uppercase tracking-widest text-white/40">Tenant Ops</div>
-          <SidebarItem icon={CreditCard} label="User Subscription" active={activeTab === 'subscription'} onClick={() => setActiveTab('subscription')} />
-          <SidebarItem icon={Mail} label="Secured Dispatch" active={activeTab === 'email-dispatch'} onClick={() => setActiveTab('email-dispatch')} />
-          <SidebarItem icon={UserCheck} label="Email Approvals" active={activeTab === 'email-approvals'} onClick={() => setActiveTab('email-approvals')} />
-          <SidebarItem icon={BarChart3} label="Email Tracking" active={activeTab === 'email-tracking'} onClick={() => setActiveTab('email-tracking')} />
-          <SidebarItem icon={ClipboardList} label="Security Audit" active={activeTab === 'email-audit'} onClick={() => setActiveTab('email-audit')} />
-          <SidebarItem icon={PlusSquare} label="Agency Intelligence" active={activeTab === 'query-agent'} onClick={() => setActiveTab('query-agent')} />
-          <SidebarItem icon={CreditCard} label="Billing & Tiers" active={activeTab === 'pricing'} onClick={() => setActiveTab('pricing')} />
-          <SidebarItem icon={Settings} label="System Settings" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
+          {currentUser.role === 'Admin' && (
+            <>
+              <div className="pt-4 pb-2 px-4 text-[10px] font-bold uppercase tracking-widest text-white/40">Tenant Ops</div>
+              <SidebarItem icon={CreditCard} label="User Subscription" active={activeTab === 'subscription'} onClick={() => setActiveTab('subscription')} />
+              <SidebarItem icon={Mail} label="Secured Dispatch" active={activeTab === 'email-dispatch'} onClick={() => setActiveTab('email-dispatch')} />
+              <SidebarItem icon={UserCheck} label="Email Approvals" active={activeTab === 'email-approvals'} onClick={() => setActiveTab('email-approvals')} />
+              <SidebarItem icon={BarChart3} label="Email Tracking" active={activeTab === 'email-tracking'} onClick={() => setActiveTab('email-tracking')} />
+              <SidebarItem icon={ClipboardList} label="Security Audit" active={activeTab === 'email-audit'} onClick={() => setActiveTab('email-audit')} />
+              <SidebarItem icon={PlusSquare} label="Agency Intelligence" active={activeTab === 'query-agent'} onClick={() => setActiveTab('query-agent')} />
+              <SidebarItem icon={CreditCard} label="Billing & Tiers" active={activeTab === 'pricing'} onClick={() => setActiveTab('pricing')} />
+              <SidebarItem icon={Settings} label="System Settings" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
+            </>
+          )}
         </nav>
 
         <div className="p-4 border-t border-white/5 space-y-4">
@@ -11246,19 +11319,71 @@ export default function App() {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 px-2 py-1 bg-emerald-50 text-emerald-600 rounded-lg">
+            <div className="flex items-center gap-2 px-2 py-1 bg-emerald-50 text-emerald-600 rounded-lg hidden sm:flex border border-emerald-100">
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-[10px] font-bold uppercase tracking-wider">A2A Sync Active</span>
+              <span className="text-[10px] font-black uppercase tracking-widest leading-none">A2A Sync Active</span>
             </div>
+            
             <button 
               onClick={() => addNotification('Checking system notifications...', 'info')}
-              className="p-2 text-agency-muted hover:text-agency-accent relative focus:outline-none"
+              className="p-2 text-agency-muted hover:text-agency-accent relative focus:outline-none bg-agency-bg rounded-lg border border-agency-border"
             >
               <Bell className="w-5 h-5" />
               <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
             </button>
-            <div className="h-8 w-8 rounded-xl bg-agency-accent flex items-center justify-center text-xs font-bold text-white shadow-lg shadow-agency-accent/20">
-              AD
+
+            <div className="h-8 w-px bg-agency-border mx-1" />
+
+            <div className="flex items-center gap-3">
+              <div className="flex flex-col items-end hidden lg:flex">
+                <span className="text-[10px] font-black uppercase tracking-tight text-agency-ink leading-none">{currentUser.name}</span>
+                <span className="text-[8px] font-bold text-agency-muted bg-agency-bg/50 px-1 py-0.5 rounded uppercase border border-agency-border mt-1">{currentUser.role}</span>
+              </div>
+              
+              <div className="relative group">
+                <button 
+                  className="w-10 h-10 rounded-xl bg-agency-bg border border-agency-border flex items-center justify-center overflow-hidden hover:border-agency-accent shadow-sm transition-all"
+                >
+                  <img src={currentUser.avatar} alt={currentUser.name} className="w-full h-full object-cover" />
+                </button>
+                
+                <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-agency-border opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[60] p-2 overflow-hidden">
+                  <div className="px-3 py-2 border-b border-agency-border mb-2 bg-agency-bg/30">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-agency-muted">Simulate Role Context</p>
+                  </div>
+                  {teamMembers.map(tm => (
+                    <button 
+                      key={tm.id}
+                      onClick={() => {
+                        setCurrentUser(tm);
+                        addNotification(`Context switched to ${tm.name} (${tm.role})`, 'info');
+                      }}
+                      className={cn(
+                        "w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-3 mb-1",
+                        currentUser.id === tm.id 
+                          ? "bg-agency-accent text-white shadow-md shadow-agency-accent/20" 
+                          : "hover:bg-agency-bg text-agency-ink hover:translate-x-1"
+                      )}
+                    >
+                      <div className="w-7 h-7 rounded-lg bg-gray-100 overflow-hidden border border-white/20">
+                        <img src={tm.avatar} alt="" className="w-full h-full object-cover" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span>{tm.name}</span>
+                        <span className={cn("text-[8px] uppercase tracking-widest", currentUser.id === tm.id ? "text-white/70" : "text-agency-muted")}>
+                          {tm.role}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                  <div className="px-3 py-2 border-t border-agency-border mt-1 pt-2">
+                    <button className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold text-red-500 hover:bg-red-50 transition-colors flex items-center gap-2">
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>Purge Session</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </header>
