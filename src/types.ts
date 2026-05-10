@@ -541,7 +541,7 @@ export interface PPCManagerResponse {
 }
 
 export type Pillar = 'online' | 'social' | 'seo' | 'ppc';
-export type Tab = 'overview' | 'online' | 'social' | 'seo' | 'ppc' | 'approvals' | 'clients' | 'protocol' | 'media' | 'personas' | 'collaboration' | 'settings' | 'vibe-library' | 'agency-config' | 'pricing' | 'query-agent' | 'email-dispatch' | 'email-approvals' | 'email-tracking' | 'email-audit';
+export type Tab = 'overview' | 'online' | 'social' | 'seo' | 'ppc' | 'approvals' | 'clients' | 'protocol' | 'media' | 'personas' | 'collaboration' | 'settings' | 'vibe-library' | 'subscription' | 'pricing' | 'query-agent' | 'email-dispatch' | 'email-approvals' | 'email-tracking' | 'email-audit';
 
 export type EmailType = 'transactional' | 'marketing' | 'reporting' | 'financial' | 'legal';
 
@@ -562,6 +562,7 @@ export interface SecureSendRequest {
   compliance: ComplianceShield;
   mfa_token?: string;
   scheduled_at?: string;
+  useSignature?: boolean;
 }
 
 export interface SecureSendResponse {
@@ -753,10 +754,24 @@ export interface Client {
   id: string;
   name: string;
   industry: string;
+  contactEmail: string;
+  contactPhone: string;
   contractValue: number;
   status: 'active' | 'onboarding' | 'churned';
+  onboardingProgress: number;
   lastActivity: Timestamp | string;
+  contractURL?: string;
   paidMedia?: PaidMediaReport;
+}
+
+export interface TeamMember {
+  id: string;
+  name: string;
+  email: string;
+  role: 'Admin' | 'Strategist' | 'Creative' | 'Technical' | 'Account Manager';
+  status: 'online' | 'offline' | 'busy';
+  avatar?: string;
+  lastActive: string;
 }
 
 export interface EmailSegment {

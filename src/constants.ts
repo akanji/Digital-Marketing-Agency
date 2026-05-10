@@ -2,6 +2,7 @@ import {
   Campaign, 
   AnalyticsData, 
   Client, 
+  TeamMember,
   SEOMetric, 
   AgentCard, 
   SystemLog, 
@@ -499,9 +500,13 @@ export const CLIENTS: Client[] = [
     id: 'c1', 
     name: 'TechFlow Systems', 
     industry: 'SaaS', 
+    contactEmail: 'ops@techflow.io',
+    contactPhone: '+1 (555) 123-4567',
     contractValue: 12000, 
     status: 'active', 
+    onboardingProgress: 100,
     lastActivity: '2026-05-03',
+    contractURL: 'https://cdn.agency.com/contracts/c1_master.pdf',
     paidMedia: {
       ppc: { spend: 5000, clicks: 1200, conversions: 45, avgCpc: 4.16 },
       social: { spend: 3000, impressions: 450000, engagement: 12000, roas: 3.8 }
@@ -511,9 +516,13 @@ export const CLIENTS: Client[] = [
     id: 'c2', 
     name: 'GreenLife Foods', 
     industry: 'E-commerce', 
+    contactEmail: 'marketing@greenlife.com',
+    contactPhone: '+1 (555) 987-6543',
     contractValue: 8500, 
     status: 'active', 
+    onboardingProgress: 100,
     lastActivity: '2026-05-04',
+    contractURL: 'https://cdn.agency.com/contracts/c2_amendment.pdf',
     paidMedia: {
       ppc: { spend: 2000, clicks: 800, conversions: 120, avgCpc: 2.50 },
       social: { spend: 4500, impressions: 850000, engagement: 35000, roas: 5.2 }
@@ -523,10 +532,52 @@ export const CLIENTS: Client[] = [
     id: 'c3', 
     name: 'Urban Gear', 
     industry: 'Retail', 
+    contactEmail: 'founder@urbangear.co',
+    contactPhone: '+1 (555) 444-5555',
     contractValue: 5000, 
     status: 'onboarding', 
+    onboardingProgress: 45,
     lastActivity: '2026-05-01' 
   },
+];
+
+export const TEAM_MEMBERS: TeamMember[] = [
+  {
+    id: 'tm1',
+    name: 'Sarah Chen',
+    email: 'sarah@agencyos.com',
+    role: 'Admin',
+    status: 'online',
+    lastActive: '2026-05-10T22:30:00Z',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah'
+  },
+  {
+    id: 'tm2',
+    name: 'Marcus Thorne',
+    email: 'marcus@agencyos.com',
+    role: 'Strategist',
+    status: 'busy',
+    lastActive: '2026-05-10T21:45:00Z',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Marcus'
+  },
+  {
+    id: 'tm3',
+    name: 'Elena Rodriguez',
+    email: 'elena@agencyos.com',
+    role: 'Creative',
+    status: 'online',
+    lastActive: '2026-05-10T22:35:00Z',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Elena'
+  },
+  {
+    id: 'tm4',
+    name: 'David Kim',
+    email: 'david@agencyos.com',
+    role: 'Technical',
+    status: 'offline',
+    lastActive: '2026-05-09T18:00:00Z',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=David'
+  }
 ];
 
 export const SEO_METRICS: SEOMetric[] = [

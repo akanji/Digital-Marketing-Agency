@@ -113,7 +113,9 @@ import {
   ClipboardList,
   Crown,
   Split,
-  LineChart
+  LineChart,
+  UserPlus,
+  Phone
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -136,7 +138,7 @@ import {
   PricingPlan,
   QueryResponse,
   QueryLogEntry,
-  Tab, Campaign, Client, AgentCard, SystemLog, ValidationCycle, Pillar, ApprovalStatus, Persona, AgencyTemplate, MediaAsset, ContentCampaign, ActiveCampaign, VocalIdentity, MediaCenterAsset, SEOCrawlReport, Deliverable, EmailSegment, AutomationWorkflow, AutomationFlowDetail, ActiveFlowsResponse, EmailTemplate, EmailTemplateDetail, TemplatesResponse, EmailVariant, PPCManagerResponse, MCCManager, LinkedClient, AttributionModel, AttributionModelsResponse, ActiveShardsResponse, PacingDetailsResponse, OptimizationApprovalResponse, BidSimulationResponse, BidSimulationHistoryResponse, SmartBiddingStatusResponse, SmartBiddingAdjustmentResponse, PPCLogsResponse, PPCLog, PPCQuickActionRequest, PPCQuickActionResponse, PPCStreamEvent, PPCPlanStatusResponse, A2ASystemStatusResponse, CloudStatusResponse, OptimizationProposal,
+  Tab, Campaign, Client, TeamMember, AgentCard, SystemLog, ValidationCycle, Pillar, ApprovalStatus, Persona, AgencyTemplate, MediaAsset, ContentCampaign, ActiveCampaign, VocalIdentity, MediaCenterAsset, SEOCrawlReport, Deliverable, EmailSegment, AutomationWorkflow, AutomationFlowDetail, ActiveFlowsResponse, EmailTemplate, EmailTemplateDetail, TemplatesResponse, EmailVariant, PPCManagerResponse, MCCManager, LinkedClient, AttributionModel, AttributionModelsResponse, ActiveShardsResponse, PacingDetailsResponse, OptimizationApprovalResponse, BidSimulationResponse, BidSimulationHistoryResponse, SmartBiddingStatusResponse, SmartBiddingAdjustmentResponse, PPCLogsResponse, PPCLog, PPCQuickActionRequest, PPCQuickActionResponse, PPCStreamEvent, PPCPlanStatusResponse, A2ASystemStatusResponse, CloudStatusResponse, OptimizationProposal,
   AudienceSegmentsResponse, AudienceSegmentDetail, CreateAudienceSegmentRequest, CreateAudienceSegmentResponse,
   SegmentHealthResponse, SegmentHealthRecommendation, ReputationMonitorResponse,
   IPWarmingControlRequest, IPWarmingControlResponse,
@@ -202,7 +204,8 @@ import {
   SUBSCRIPTION_TIERS,
   PRICING_PLANS,
   DEFAULT_BRANDING,
-  PPC_MANAGER_DATA
+  PPC_MANAGER_DATA,
+  TEAM_MEMBERS
 } from './constants';
 
 // --- Utilities ---
@@ -7442,7 +7445,19 @@ const PersonasView = ({
   );
 };
 
-const CollaborationView = ({ onAction }: { onAction: (name: string, type?: string) => void }) => {
+const CollaborationView = ({ 
+  onAction, 
+  teamMembers, 
+  onAddTeam, 
+  onEditTeam, 
+  onDeleteTeam 
+}: { 
+  onAction: (name: string, type?: string) => void,
+  teamMembers: TeamMember[],
+  onAddTeam: () => void,
+  onEditTeam: (tm: TeamMember) => void,
+  onDeleteTeam: (id: string) => void
+}) => {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const shareUrl = "https://ais-pre-s3mbkuit5jexstnpi4q5vn-535361250845.us-east1.run.app";
@@ -10137,220 +10152,142 @@ const MediaCenterView = ({
   );
 };
 
-const ClientsView = ({ onAction }: { onAction: (name: string, type?: string) => void }) => (
+const ClientsView = ({ 
+  clients, 
+  onAction, 
+  onAdd, 
+  onEdit, 
+  onDelete 
+}: { 
+  clients: Client[], 
+  onAction: (name: string, type?: string) => void,
+  onAdd: () => void,
+  onEdit: (client: Client) => void,
+  onDelete: (id: string) => void
+}) => (
   <div className="space-y-8 animate-in slide-in-from-right-4 duration-500">
     <div className="flex justify-between items-center text-agency-ink">
       <div>
-        <h2 className="text-2xl font-bold font-display uppercase tracking-tight">Accounts & Partners</h2>
-        <p className="text-xs text-agency-muted font-bold uppercase tracking-widest mt-1">Multi-Tenant Client Portal Access Control</p>
+        <h2 className="text-2xl font-bold font-display uppercase tracking-tight">Client Management Core</h2>
+        <p className="text-xs text-agency-muted font-bold uppercase tracking-widest mt-1">Lifecycle Tracking & Contract Intelligence</p>
       </div>
       <button 
-        onClick={() => onAction('Initializing new client onboarding flow...', 'info')}
-        className="px-4 py-2 bg-agency-accent text-white rounded-xl text-xs font-bold uppercase tracking-widest flex items-center gap-2"
+        onClick={onAdd}
+        className="px-4 py-2 bg-agency-accent text-white rounded-xl text-xs font-bold uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-agency-accent/20 hover:scale-[1.02] transition-all"
       >
-        <Plus className="w-3.5 h-3.5" /> Add Account
+        <Plus className="w-3.5 h-3.5" /> Add New Client
       </button>
     </div>
 
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div className="lg:col-span-2 panel-card p-6 border-l-4 border-l-agency-accent">
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h3 className="font-bold text-lg font-display uppercase tracking-tight">Prospect Intelligence Engine</h3>
-            <p className="text-xs text-agency-muted">Autonomous lead identification & automated proposal generation.</p>
-          </div>
-          <button 
-            onClick={() => onAction('Scanning high-intent industries for lead candidates...', 'info')}
-            className="px-3 py-1.5 bg-agency-bg border border-agency-border rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-white transition-colors"
-          >
-            Mine New Prospects
-          </button>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="border-b border-agency-border">
-                <th className="pb-3 text-[9px] font-black uppercase tracking-widest text-agency-muted px-2">Potential Client</th>
-                <th className="pb-3 text-[9px] font-black uppercase tracking-widest text-agency-muted px-2">Growth Score</th>
-                <th className="pb-3 text-[9px] font-black uppercase tracking-widest text-agency-muted px-2">Est. Ad Spend</th>
-                <th className="pb-3 text-[9px] font-black uppercase tracking-widest text-agency-muted px-2 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-agency-border">
-              {[
-                { name: 'Aurora Health Tech', score: 94, spend: '$25,000/mo', intent: 'High' },
-                { name: 'Nebula Logistics', score: 82, spend: '$12,500/mo', intent: 'Rising' },
-                { name: 'Zenith Retail Group', score: 78, spend: '$45,000/mo', intent: 'High' },
-              ].map((prospect) => (
-                <tr key={prospect.name} className="group hover:bg-agency-bg transition-colors">
-                  <td className="py-4 px-2">
-                    <div className="text-xs font-bold text-agency-ink">{prospect.name}</div>
-                    <div className="text-[9px] text-agency-muted font-bold uppercase tracking-tighter">{prospect.intent} Intent</div>
-                  </td>
-                  <td className="py-4 px-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-16 h-1 bg-white border border-agency-border rounded-full overflow-hidden">
-                        <div className="h-full bg-agency-accent" style={{ width: `${prospect.score}%` }} />
-                      </div>
-                      <span className="text-[10px] font-bold">{prospect.score}%</span>
-                    </div>
-                  </td>
-                  <td className="py-4 px-2 text-xs font-mono font-bold text-agency-ink">{prospect.spend}</td>
-                  <td className="py-4 px-2 text-right">
-                    <button 
-                      onClick={() => onAction(`Generating autonomous marketing proposal for ${prospect.name}...`, 'success')}
-                      className="px-2 py-1 bg-agency-accent/10 border border-agency-accent/20 rounded text-[9px] font-black uppercase text-agency-accent hover:bg-agency-accent hover:text-white transition-all"
-                    >
-                      Draft Proposal
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div className="panel-card p-6 flex flex-col justify-between">
-        <div>
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 rounded-lg bg-blue-50 border border-blue-100">
-              <BadgeCheck className="w-5 h-5 text-blue-600" />
-            </div>
-            <div>
-              <h3 className="font-bold font-display uppercase tracking-tight">Onboarding Bot</h3>
-              <p className="text-[10px] uppercase tracking-widest text-agency-muted font-bold">24/7 Automated Agent</p>
-            </div>
-          </div>
-          <div className="p-4 bg-agency-bg rounded-xl border border-agency-border space-y-4">
-            <div className="flex gap-3">
-              <div className="w-6 h-6 rounded-lg bg-agency-accent flex items-center justify-center text-white shrink-0">
-                <Zap className="w-3.5 h-3.5" />
-              </div>
-              <div className="text-[11px] font-medium leading-relaxed bg-white p-2 rounded-lg border border-agency-border">
-                I've detected a new lead from Zenith Retail. Should I initiate the autonomous discovery sequence?
-              </div>
-            </div>
-            <div className="flex justify-end">
-              <div className="text-[11px] font-bold uppercase tracking-widest text-agency-accent border-b border-agency-accent cursor-pointer">Yes, begin sequence</div>
-            </div>
-          </div>
-        </div>
-        <div className="mt-6 pt-6 border-t border-agency-border">
-          <div className="flex justify-between items-center mb-4">
-            <span className="text-[10px] font-black uppercase text-agency-muted">Conversion Efficiency</span>
-            <span className="text-xs font-bold text-emerald-600">88%</span>
-          </div>
-          <div className="h-1.5 w-full bg-agency-bg rounded-full overflow-hidden">
-            <div className="h-full bg-emerald-500" style={{ width: '88%' }} />
-          </div>
-          <p className="text-[9px] text-agency-muted mt-2">White-label agents have successfully qualified 8 out of the last 10 prospects autonomously.</p>
-        </div>
-      </div>
-    </div>
-
     <div className="grid grid-cols-1 gap-6">
-      {CLIENTS.map((client) => (
-        <div key={client.id} className="panel-card overflow-hidden">
+      {clients.map((client) => (
+        <div key={client.id} className="panel-card group overflow-hidden border border-agency-border hover:border-agency-accent/30 transition-all">
           <div className="p-6 border-b border-agency-border flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-agency-bg flex items-center justify-center border border-agency-border">
-                <Users className="w-6 h-6 text-agency-accent" />
+              <div className="w-14 h-14 rounded-2xl bg-agency-bg flex items-center justify-center border border-agency-border group-hover:bg-white transition-colors">
+                <Users className="w-7 h-7 text-agency-accent" />
               </div>
               <div>
-                <h3 className="font-bold text-lg font-display">{client.name}</h3>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-agency-muted">{client.industry}</span>
-                  <div className="w-1 h-1 rounded-full bg-agency-border" />
-                  <span className={cn(
-                    "text-[10px] font-bold uppercase px-1.5 py-0.5 rounded",
-                    client.status === 'active' ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"
-                  )}>{client.status}</span>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-6">
-              <div className="text-right">
-                <div className="text-[10px] uppercase font-bold text-agency-muted">Contract Value</div>
-                <div className="text-sm font-bold text-agency-ink">{formatCurrency(client.contractValue)}/mo</div>
-              </div>
-              <button 
-                onClick={() => onAction(`Opening profile for ${client.name}...`, 'info')}
-                className="px-4 py-2 bg-agency-bg border border-agency-border rounded-lg text-xs font-bold hover:bg-white transition-colors"
-              >
-                View Profile
-              </button>
-            </div>
-          </div>
-          
-          {client.paidMedia ? (
-            <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* PPC Panel */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <Search className="w-4 h-4 text-agency-accent" />
-                  <h4 className="text-xs font-bold uppercase tracking-widest text-agency-ink">Paid Search (PPC)</h4>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  <div className="p-3 bg-agency-bg rounded-lg">
-                    <div className="text-[10px] text-agency-muted font-bold uppercase mb-1">Spend</div>
-                    <div className="text-sm font-bold">{formatCurrency(client.paidMedia.ppc.spend)}</div>
+                <h3 className="font-bold text-xl font-display text-agency-ink">{client.name}</h3>
+                <div className="flex flex-wrap items-center gap-3 mt-1.5">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-agency-muted px-2 py-0.5 bg-agency-bg rounded border border-agency-border">{client.industry}</span>
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-agency-muted">
+                    <Mail className="w-3 h-3" /> {client.contactEmail}
                   </div>
-                  <div className="p-3 bg-agency-bg rounded-lg">
-                    <div className="text-[10px] text-agency-muted font-bold uppercase mb-1">Clicks</div>
-                    <div className="text-sm font-bold">{client.paidMedia.ppc.clicks.toLocaleString()}</div>
-                  </div>
-                  <div className="p-3 bg-agency-bg rounded-lg">
-                    <div className="text-[10px] text-agency-muted font-bold uppercase mb-1">Conv.</div>
-                    <div className="text-sm font-bold">{client.paidMedia.ppc.conversions}</div>
-                  </div>
-                  <div className="p-3 bg-agency-bg rounded-lg">
-                    <div className="text-[10px] text-agency-muted font-bold uppercase mb-1">Avg. CPC</div>
-                    <div className="text-sm font-bold">${client.paidMedia.ppc.avgCpc}</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Social Ads Panel */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <Share2 className="w-4 h-4 text-agency-accent" />
-                  <h4 className="text-xs font-bold uppercase tracking-widest text-agency-ink">Paid Social Ads</h4>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  <div className="p-3 bg-agency-bg rounded-lg">
-                    <div className="text-[10px] text-agency-muted font-bold uppercase mb-1">Spend</div>
-                    <div className="text-sm font-bold">{formatCurrency(client.paidMedia.social.spend)}</div>
-                  </div>
-                  <div className="p-3 bg-agency-bg rounded-lg">
-                    <div className="text-[10px] text-agency-muted font-bold uppercase mb-1">Impressions</div>
-                    <div className="text-sm font-bold">{(client.paidMedia.social.impressions / 1000).toFixed(1)}k</div>
-                  </div>
-                  <div className="p-3 bg-agency-bg rounded-lg">
-                    <div className="text-[10px] text-agency-muted font-bold uppercase mb-1">Engagement</div>
-                    <div className="text-sm font-bold">{(client.paidMedia.social.engagement / 1000).toFixed(1)}k</div>
-                  </div>
-                  <div className="p-3 bg-agency-bg rounded-lg">
-                    <div className="text-[10px] text-agency-muted font-bold uppercase mb-1">ROAS</div>
-                    <div className="text-sm font-bold text-agency-accent">{client.paidMedia.social.roas}x</div>
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-agency-muted">
+                    <Phone className="w-3 h-3" /> {client.contactPhone}
                   </div>
                 </div>
               </div>
             </div>
-          ) : (
-            <div className="p-6 bg-agency-bg/50 flex items-center justify-center border-t border-agency-border">
-              <div className="text-center py-4">
-                <div className="text-xs font-bold text-agency-muted uppercase tracking-widest mb-1">Paid Media Core Inactive</div>
-                <p className="text-[10px] text-agency-muted">Awaiting campaign initialization from Growth Department.</p>
+            <div className="flex items-center gap-4">
+              <div className="text-right hidden sm:block">
+                <div className="text-[10px] uppercase font-black text-agency-muted tracking-widest">Contract Value</div>
+                <div className="text-lg font-black text-agency-ink">{formatCurrency(client.contractValue)}<span className="text-[10px] text-agency-muted ml-1">/MO</span></div>
+              </div>
+              <div className="w-px h-10 bg-agency-border hidden sm:block" />
+              <div className="flex gap-2">
                 <button 
-                  onClick={() => onAction(`Initializing paid media strategy for ${client.name}...`, 'success')}
-                  className="mt-4 px-3 py-1.5 bg-agency-accent text-white rounded text-[10px] font-bold uppercase tracking-widest shadow-sm"
+                  onClick={() => onEdit(client)}
+                  className="p-2 bg-white border border-agency-border rounded-xl text-agency-muted hover:text-agency-accent hover:border-agency-accent transition-all"
                 >
-                  Initialize Paid Strategy
+                  <Edit3 className="w-4 h-4" />
+                </button>
+                <button 
+                  onClick={() => onDelete(client.id)}
+                  className="p-2 bg-white border border-agency-border rounded-xl text-agency-muted hover:text-red-500 hover:border-red-200 transition-all"
+                >
+                  <Trash2 className="w-4 h-4" />
                 </button>
               </div>
             </div>
-          )}
+          </div>
+          
+          <div className="p-6 bg-agency-bg/30 grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="md:col-span-1 space-y-4">
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-[10px] font-black uppercase text-agency-muted tracking-widest">Onboarding Status</span>
+                  <span className="text-xs font-bold text-agency-ink">{client.onboardingProgress}%</span>
+                </div>
+                <div className="h-2 w-full bg-white rounded-full overflow-hidden border border-agency-border shadow-inner">
+                  <div 
+                    className={cn(
+                      "h-full transition-all duration-1000",
+                      client.onboardingProgress === 100 ? "bg-emerald-500" : "bg-agency-accent"
+                    )} 
+                    style={{ width: `${client.onboardingProgress}%` }} 
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                 <button 
+                  className={cn(
+                    "flex-1 py-2 px-3 rounded-lg text-[9px] font-black uppercase tracking-widest border transition-all",
+                    client.status === 'active' ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-amber-50 text-amber-600 border-amber-100"
+                  )}
+                 >
+                   {client.status}
+                 </button>
+                 {client.contractURL && (
+                    <a 
+                      href={client.contractURL} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="p-2 bg-white border border-agency-border rounded-lg text-agency-muted hover:text-blue-600 transition-all"
+                    >
+                       <FileText className="w-4 h-4" />
+                    </a>
+                 )}
+              </div>
+            </div>
+
+            <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-6">
+               <div className="space-y-2">
+                  <h4 className="text-[9px] font-black uppercase tracking-widest text-agency-muted">Active Shards</h4>
+                  <div className="flex flex-wrap gap-1.5">
+                    {['Media Synth', 'SEO Core', 'Ad Pipeline'].map(shard => (
+                      <span key={shard} className="px-2 py-1 bg-white border border-agency-border rounded text-[9px] font-bold text-agency-ink">{shard}</span>
+                    ))}
+                  </div>
+               </div>
+               <div className="space-y-2">
+                  <h4 className="text-[9px] font-black uppercase tracking-widest text-agency-muted">Last Operation</h4>
+                  <div className="p-3 bg-white border border-agency-border rounded-xl">
+                    <p className="text-[10px] font-bold text-agency-ink truncate">Snapshot: protocol_v1.4.2</p>
+                    <p className="text-[8px] text-agency-muted uppercase font-black tracking-widest mt-1">{new Date(client.lastActivity.toString()).toLocaleDateString()}</p>
+                  </div>
+               </div>
+               <div className="flex items-center justify-end">
+                  <button 
+                    onClick={() => onAction(`Initiating executive audit for ${client.name}...`, 'info')}
+                    className="px-6 py-3 bg-agency-ink text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-agency-accent transition-all flex items-center gap-2"
+                  >
+                    View Insights <ChevronRight className="w-3 h-3" />
+                  </button>
+               </div>
+            </div>
+          </div>
         </div>
       ))}
     </div>
@@ -10359,259 +10296,134 @@ const ClientsView = ({ onAction }: { onAction: (name: string, type?: string) => 
 
 // --- App Layout ---
 
-const AgencyConfigView = ({ 
-  branding, 
-  setBranding, 
-  subscription, 
-  setSubscription, 
-  onAction,
-  onProvision,
-  isProvisioning,
-  tenantId
-}: { 
-  branding: any, 
-  setBranding: (b: any) => void, 
-  subscription: any, 
-  setSubscription: (s: any) => void,
-  onAction: (name: string, type?: string) => void,
-  onProvision: (config: any) => Promise<void>,
-  isProvisioning: boolean,
-  tenantId: string
-}) => (
-  <div className="space-y-8 animate-in slide-in-from-right-4 duration-500">
-    <div className="flex justify-between items-center text-agency-ink">
-      <div>
-        <h2 className="text-2xl font-bold font-display uppercase tracking-tight">Agency Configuration</h2>
-        <p className="text-xs text-agency-muted font-bold uppercase tracking-widest mt-1">Tenant Settings & White-Label Management</p>
-      </div>
-      <div className="flex gap-2">
-        <button 
-          onClick={() => onAction('Syncing branding to all client portals...', 'success')}
-          className="px-4 py-2 bg-agency-accent text-white rounded-xl text-xs font-bold uppercase tracking-widest"
-        >
-          Push Global Branding
-        </button>
-      </div>
-    </div>
+const UserSubscriptionView = ({ onAction }: { onAction: (name: string, type?: string) => void }) => {
+  const [isProcessing, setIsProcessing] = useState<string | null>(null);
 
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      {/* Branding & White-Label */}
-      <div className="lg:col-span-2 space-y-6">
-        <div className="panel-card p-6">
-          <h3 className="font-bold text-lg font-display mb-6 flex items-center gap-2">
-            <Palette className="w-5 h-5 text-agency-accent" /> Brand Identity
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase text-agency-muted tracking-widest">Agency Name</label>
-              <input 
-                type="text" 
-                value={branding.agencyName} 
-                onChange={(e) => setBranding({ ...branding, agencyName: e.target.value })}
-                className="w-full bg-agency-bg border border-agency-border rounded-xl px-4 py-3 text-sm font-bold text-agency-ink focus:border-agency-accent outline-none"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase text-agency-muted tracking-widest">Tagline</label>
-              <input 
-                type="text" 
-                value={branding.tagline} 
-                onChange={(e) => setBranding({ ...branding, tagline: e.target.value })}
-                className="w-full bg-agency-bg border border-agency-border rounded-xl px-4 py-3 text-sm font-bold text-agency-ink focus:border-agency-accent outline-none"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase text-agency-muted tracking-widest">Custom Domain</label>
-              <input 
-                type="text" 
-                value={branding.domain} 
-                onChange={(e) => setBranding({ ...branding, domain: e.target.value })}
-                className="w-full bg-agency-bg border border-agency-border rounded-xl px-4 py-3 text-sm font-bold text-agency-ink focus:border-agency-accent outline-none"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase text-agency-muted tracking-widest">Primary Color</label>
-              <div className="flex gap-3">
-                <input 
-                  type="color" 
-                  value={branding.primaryColor} 
-                  onChange={(e) => setBranding({ ...branding, primaryColor: e.target.value })}
-                  className="w-12 h-12 rounded-xl border border-agency-border p-1 bg-white cursor-pointer"
-                />
-                <input 
-                  type="text" 
-                  value={branding.primaryColor} 
-                  readOnly
-                  className="flex-1 bg-agency-bg border border-agency-border rounded-xl px-4 py-3 text-sm font-mono font-bold text-agency-ink"
-                />
-              </div>
-            </div>
-          </div>
-          <div className="mt-8 p-6 bg-agency-bg rounded-2xl border-2 border-dashed border-agency-border text-center">
-            <Upload className="w-8 h-8 text-agency-muted mx-auto mb-3" />
-            <div className="text-xs font-bold text-agency-ink">Upload Brand Logo</div>
-            <p className="text-[10px] text-agency-muted mt-1">Recommended size: 512x512px. SVG or PNG.</p>
-          </div>
+  const handleSubscriptionFlow = async (priceId: string, planName: string) => {
+    setIsProcessing(planName);
+    onAction(`Initializing secure checkout protocol for ${planName} tier...`, 'info');
+
+    try {
+      const response = await fetch('/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          priceId,
+          customer_email: 'phidephefem@gmail.com'
+        })
+      });
+
+      const data = await response.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error('No checkout URL returned');
+      }
+    } catch (error) {
+      console.error(error);
+      onAction('Subscription sequence failed. Please check network connectivity.', 'error');
+    } finally {
+      setIsProcessing(null);
+    }
+  };
+
+  return (
+    <div className="space-y-8 animate-in slide-in-from-right-4 duration-500">
+      <div className="flex justify-between items-center text-agency-ink">
+        <div>
+          <h2 className="text-2xl font-bold font-display uppercase tracking-tight">User Subscription Management</h2>
+          <p className="text-xs text-agency-muted font-bold uppercase tracking-widest mt-1">Scale Your Agency Intelligence Capacity</p>
         </div>
+      </div>
 
-        <div className="panel-card p-8 bg-agency-sidebar text-white">
-          <div className="flex justify-between items-start mb-8">
-            <div>
-              <h3 className="text-lg font-bold font-display uppercase tracking-tight flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-agency-accent" /> Tenant Orchestrator
-              </h3>
-              <p className="text-[10px] text-white/50 font-bold uppercase tracking-widest mt-1">Provision nodes & specialized AI compute</p>
-            </div>
-            <div className="text-right">
-               <div className="text-[9px] font-black uppercase text-white/40 mb-1">Status</div>
-               <div className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded text-[9px] font-black uppercase tracking-widest border border-emerald-500/30">Synced</div>
-            </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        {/* Trial Card */}
+        <div className="panel-card p-8 border-t-4 border-t-emerald-500 relative overflow-hidden group bg-emerald-50/10">
+          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+            <Sparkles className="w-20 h-20 text-emerald-500" />
           </div>
-
-          <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-4 bg-white/5 border border-white/10 rounded-2xl">
-                 <div className="text-[9px] font-black text-white/40 uppercase mb-2">Instance ID</div>
-                 <div className="text-xs font-mono font-bold text-agency-accent">{tenantId}</div>
-              </div>
-              <div className="p-4 bg-white/5 border border-white/10 rounded-2xl">
-                 <div className="text-[9px] font-black text-white/40 uppercase mb-2">Edge Routing</div>
-                 <div className="text-xs font-bold text-white">Active (Global)</div>
-              </div>
+          <div className="relative z-10">
+            <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center mb-6">
+              <ShieldCheck className="w-6 h-6 text-emerald-600" />
             </div>
-
+            <h3 className="text-xl font-bold text-agency-ink mb-2">7-Day Free Trial</h3>
+            <p className="text-sm text-agency-muted mb-8 leading-relaxed">Unlock the full agentic engine for one week. Complete access to predictive routing and media synthesis.</p>
+            <div className="text-3xl font-black text-agency-ink mb-8">$0.00 <span className="text-xs font-bold text-agency-muted">/ FIRST WEEK</span></div>
+            <ul className="space-y-3 mb-8">
+              {['All Base Features', 'Agentic Deployments', 'Live Stream Access'].map(item => (
+                <li key={item} className="flex items-center gap-2 text-[10px] font-black uppercase text-agency-ink tracking-tight">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500" /> {item}
+                </li>
+              ))}
+            </ul>
             <button 
-              onClick={() => onProvision({ name: branding.agencyName, domain: branding.domain, branding })}
-              disabled={isProvisioning}
-              className="w-full py-4 bg-agency-accent text-white rounded-2xl text-xs font-bold uppercase tracking-widest shadow-xl shadow-agency-accent/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+              onClick={() => handleSubscriptionFlow('price_1TUy6KBMbxh6jv0CSQvph3ev', 'Free Trial')}
+              disabled={isProcessing !== null}
+              className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black uppercase tracking-widest transition-all disabled:opacity-50 shadow-lg shadow-emerald-200"
             >
-              {isProvisioning ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  Provisioning AI Shards...
-                </>
-              ) : (
-                <>
-                  <Zap className="w-4 h-4" />
-                  Full-Stack Provision Tenant
-                </>
-              )}
+              {isProcessing === 'Free Trial' ? 'Processing...' : 'Sign Up For Free Trial'}
             </button>
           </div>
         </div>
 
-        <div className="panel-card p-6">
-          <h3 className="font-bold text-lg font-display mb-6 flex items-center gap-2">
-            <CreditCard className="w-5 h-5 text-agency-accent" /> Subscription Tiers
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {SUBSCRIPTION_TIERS.map((tier) => (
-              <button 
-                key={tier.id}
-                onClick={() => {
-                  setSubscription(tier);
-                  onAction(`Upgraded to ${tier.name} tier.`, 'success');
-                }}
-                className={cn(
-                  "p-6 rounded-2xl border-2 text-left transition-all relative overflow-hidden group",
-                  subscription.id === tier.id 
-                    ? "bg-agency-accent border-agency-accent text-white" 
-                    : "bg-white border-agency-border hover:border-agency-accent"
-                )}
-              >
-                {subscription.id === tier.id && (
-                  <div className="absolute top-0 right-0 p-2">
-                    <CheckCircle2 className="w-5 h-5" />
-                  </div>
-                )}
-                <div className={cn("text-[10px] font-black uppercase tracking-widest mb-1", subscription.id === tier.id ? "text-white/70" : "text-agency-muted")}>Plan Tier</div>
-                <div className="text-xl font-bold font-display">{tier.name}</div>
-                <div className={cn("text-2xl font-black mt-2", subscription.id === tier.id ? "text-white" : "text-agency-accent")}>{tier.price}</div>
-                <ul className="mt-4 space-y-2">
-                  {tier.features.slice(0, 3).map((f, i) => (
-                    <li key={i} className="flex items-center gap-2 text-[10px] font-bold">
-                      <div className={cn("w-1 h-1 rounded-full", subscription.id === tier.id ? "bg-white" : "bg-agency-accent")} />
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="space-y-6">
-        <div className="panel-card p-6">
-          <h3 className="font-bold text-sm font-display uppercase tracking-tight mb-6 flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-agency-accent" /> Tenant Health
-          </h3>
-          <div className="space-y-4">
-            <div className="p-4 bg-agency-bg rounded-xl border border-agency-border">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-[10px] font-black uppercase text-agency-muted">User Seats</span>
-                <span className="text-xs font-bold text-agency-ink">3 / {subscription.limits.users}</span>
-              </div>
-              <div className="h-1.5 w-full bg-white rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-agency-accent" 
-                  style={{ width: `${(3 / subscription.limits.users) * 100}%` }} 
-                />
-              </div>
+        {/* Monthly Card */}
+        <div className="panel-card p-8 border-t-4 border-t-blue-500 relative overflow-hidden group">
+          <div className="relative z-10">
+            <div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center mb-6">
+              <CreditCard className="w-6 h-6 text-blue-600" />
             </div>
-            <div className="p-4 bg-agency-bg rounded-xl border border-agency-border">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-[10px] font-black uppercase text-agency-muted">Client Accounts</span>
-                <span className="text-xs font-bold text-agency-ink">12 / {subscription.limits.clients}</span>
-              </div>
-              <div className="h-1.5 w-full bg-white rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-emerald-500" 
-                  style={{ width: `${(12 / subscription.limits.clients) * 100}%` }} 
-                />
-              </div>
-            </div>
-          </div>
-          <div className="mt-6 pt-6 border-t border-agency-border">
-            <div className="flex items-center gap-3 text-emerald-600 bg-emerald-50 p-3 rounded-xl border border-emerald-100">
-              <ShieldCheckIcon className="w-5 h-5 flex-shrink-0" />
-              <div className="text-[10px] font-bold leading-tight">System isolated. Database-level sandboxing active for tenant.</div>
-            </div>
+            <h3 className="text-xl font-bold text-agency-ink mb-2">$19.99 Monthly</h3>
+            <p className="text-sm text-agency-muted mb-8 leading-relaxed">Scalable monthly ops for active agency growth. Sub-millisecond latency on all AI operations.</p>
+            <div className="text-3xl font-black text-agency-ink mb-8">$19.99 <span className="text-xs font-bold text-agency-muted">/ MONTH</span></div>
+            <ul className="space-y-3 mb-8">
+              {['Priority Queue', 'Custom Brand DNA', 'API Access Protocol'].map(item => (
+                <li key={item} className="flex items-center gap-2 text-[10px] font-black uppercase text-agency-ink tracking-tight">
+                  <CheckCircle2 className="w-4 h-4 text-blue-500" /> {item}
+                </li>
+              ))}
+            </ul>
+            <button 
+              onClick={() => handleSubscriptionFlow('price_1TUy6KBMbxh6jv0CSQvph3ev', 'Monthly')}
+              disabled={isProcessing !== null}
+              className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black uppercase tracking-widest transition-all disabled:opacity-50 shadow-lg shadow-blue-200"
+            >
+              {isProcessing === 'Monthly' ? 'Processing...' : 'Subscribe Monthly'}
+            </button>
           </div>
         </div>
 
-        <div className="panel-card p-6 bg-slate-900 text-white">
-          <h3 className="font-bold text-sm font-display uppercase tracking-tight mb-6 flex items-center gap-2">
-            <Zap className="w-4 h-4 text-agency-accent" /> Reseller Markup
-          </h3>
-          <div className="space-y-4">
-            <p className="text-[10px] text-slate-500 leading-relaxed">
-              Define the global margin to be applied to all white-label services delivered via the AOS infrastructure.
-            </p>
-            <div className="p-4 bg-white/5 rounded-xl border border-white/10">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-[10px] font-bold text-slate-400 uppercase">Current Margin %</span>
-                <span className="text-sm font-black text-agency-accent">40.0%</span>
-              </div>
-              <div className="h-1 w-full bg-white/10 rounded-full overflow-hidden">
-                <div className="h-full bg-agency-accent w-[40%]" />
-              </div>
+        {/* Yearly Card */}
+        <div className="panel-card p-8 border-t-4 border-t-purple-500 relative overflow-hidden group">
+          <div className="absolute top-4 right-4 z-20">
+             <div className="bg-purple-100 text-purple-700 text-[10px] font-black uppercase px-3 py-1 rounded-full tracking-widest">Global Elite</div>
+          </div>
+          <div className="relative z-10">
+            <div className="w-12 h-12 bg-purple-100 rounded-2xl flex items-center justify-center mb-6">
+              <Crown className="w-6 h-6 text-purple-600" />
             </div>
-            <div className="pt-2">
-              <button 
-                onClick={() => onAction('Entering markup adjustment mode...', 'info')}
-                className="w-full py-2.5 bg-white/5 border border-white/10 rounded-xl text-[10px] font-bold uppercase tracking-widest text-slate-300 hover:bg-white/10 transition-colors"
-              >
-                Fine-Tune Markup Matrix
-              </button>
-            </div>
+            <h3 className="text-xl font-bold text-agency-ink mb-2">$199.99 Yearly</h3>
+            <p className="text-sm text-agency-muted mb-8 leading-relaxed">Enterprise-grade dedication. Lowest latency, unlimited nodes, and complete strategic sovereignty.</p>
+            <div className="text-3xl font-black text-agency-ink mb-8">$199.99 <span className="text-xs font-bold text-agency-muted">/ YEAR</span></div>
+            <ul className="space-y-3 mb-8">
+              {['Unlimited Synthesis', 'Dedicated Nodes', 'Beta Vibe Access'].map(item => (
+                <li key={item} className="flex items-center gap-2 text-[10px] font-black uppercase text-agency-ink tracking-tight">
+                  <CheckCircle2 className="w-4 h-4 text-purple-500" /> {item}
+                </li>
+              ))}
+            </ul>
+            <button 
+              onClick={() => handleSubscriptionFlow('price_1TUy7oBMbxh6jv0CwMdQOBII', 'Yearly')}
+              disabled={isProcessing !== null}
+              className="w-full py-4 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl font-black uppercase tracking-widest transition-all disabled:opacity-50 shadow-lg shadow-purple-200"
+            >
+              {isProcessing === 'Yearly' ? 'Processing...' : 'Go Unlimited Yearly'}
+            </button>
           </div>
         </div>
       </div>
     </div>
-  </div>
-);
-
+  );
+};
 const TAB_MAPPING: Record<string, Tab> = {
   'overview': 'overview',
   'online': 'online',
@@ -10626,7 +10438,8 @@ const TAB_MAPPING: Record<string, Tab> = {
   'collaboration': 'collaboration',
   'settings': 'settings',
   'vibe-library': 'vibe-library',
-  'agency-config': 'agency-config',
+  'agency-config': 'subscription',
+  'subscription': 'subscription',
   'pricing': 'pricing',
   'query-agent': 'query-agent',
   'intelligence': 'query-agent',
@@ -10636,6 +10449,289 @@ const TAB_MAPPING: Record<string, Tab> = {
   'email-approvals': 'email-approvals',
   'email-tracking': 'email-tracking',
   'email-audit': 'email-audit'
+};
+
+const ClientModal = ({ 
+  isOpen, 
+  onClose, 
+  onSave, 
+  client 
+}: { 
+  isOpen: boolean, 
+  onClose: () => void, 
+  onSave: (client: Client) => void,
+  client: Client | null
+}) => {
+  const [formData, setFormData] = useState<Partial<Client>>(
+    client || { 
+      name: '', 
+      industry: '', 
+      status: 'active', 
+      contractValue: 5000,
+      contactEmail: '',
+      contactPhone: '',
+      onboardingProgress: 0,
+      contractURL: ''
+    }
+  );
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
+      <motion.div 
+        initial={{ opacity: 0 }} 
+        animate={{ opacity: 1 }} 
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="absolute inset-0 bg-agency-ink/80 backdrop-blur-sm" 
+      />
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden border border-agency-border"
+      >
+        <div className="p-6 border-b border-agency-border flex justify-between items-center bg-agency-bg/50">
+          <h3 className="text-xl font-bold font-display uppercase tracking-tight text-agency-ink">
+            {client ? 'Recalibrate Client Entity' : 'Initialize New Client Shard'}
+          </h3>
+          <button onClick={onClose} className="p-2 hover:bg-agency-bg rounded-xl transition-colors">
+            <X className="w-5 h-5 text-agency-muted" />
+          </button>
+        </div>
+        <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-agency-muted mb-1.5">Client Name</label>
+              <input 
+                type="text" 
+                value={formData.name}
+                onChange={e => setFormData({...formData, name: e.target.value})}
+                className="w-full px-4 py-3 bg-agency-bg border border-agency-border rounded-xl text-sm font-bold focus:outline-none focus:border-agency-accent transition-all"
+                placeholder="Cyberdyne Systems"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-agency-muted mb-1.5">Industry</label>
+                <input 
+                  type="text" 
+                  value={formData.industry}
+                  onChange={e => setFormData({...formData, industry: e.target.value})}
+                  className="w-full px-4 py-3 bg-agency-bg border border-agency-border rounded-xl text-sm font-bold focus:outline-none focus:border-agency-accent transition-all"
+                  placeholder="Advanced AI"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-agency-muted mb-1.5">Status</label>
+                <select 
+                  value={formData.status}
+                  onChange={e => setFormData({...formData, status: e.target.value as any})}
+                  className="w-full px-4 py-3 bg-agency-bg border border-agency-border rounded-xl text-sm font-bold focus:outline-none focus:border-agency-accent appearance-none transition-all"
+                >
+                  <option value="active">Active</option>
+                  <option value="onboarding">Onboarding</option>
+                  <option value="paused">Paused</option>
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-agency-muted mb-1.5">Contact Email</label>
+                <input 
+                  type="email" 
+                  value={formData.contactEmail}
+                  onChange={e => setFormData({...formData, contactEmail: e.target.value})}
+                  className="w-full px-4 py-3 bg-agency-bg border border-agency-border rounded-xl text-sm font-bold focus:outline-none focus:border-agency-accent transition-all"
+                  placeholder="admin@cyberdyne.com"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-agency-muted mb-1.5">Contact Phone</label>
+                <input 
+                  type="text" 
+                  value={formData.contactPhone}
+                  onChange={e => setFormData({...formData, contactPhone: e.target.value})}
+                  className="w-full px-4 py-3 bg-agency-bg border border-agency-border rounded-xl text-sm font-bold focus:outline-none focus:border-agency-accent transition-all"
+                  placeholder="+1 (555) 000-0000"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-agency-muted mb-1.5">Onboarding Progress (%)</label>
+              <input 
+                type="range" 
+                min="0" 
+                max="100"
+                value={formData.onboardingProgress}
+                onChange={e => setFormData({...formData, onboardingProgress: parseInt(e.target.value)})}
+                className="w-full h-2 bg-agency-bg rounded-lg appearance-none cursor-pointer accent-agency-accent border border-agency-border"
+              />
+              <div className="text-right text-[10px] font-bold text-agency-accent mt-1">{formData.onboardingProgress}%</div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+               <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-agency-muted mb-1.5">Contract Value ($)</label>
+                <input 
+                  type="number" 
+                  value={formData.contractValue}
+                  onChange={e => setFormData({...formData, contractValue: parseInt(e.target.value)})}
+                  className="w-full px-4 py-3 bg-agency-bg border border-agency-border rounded-xl text-sm font-bold focus:outline-none focus:border-agency-accent transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-agency-muted mb-1.5">Contract URL</label>
+                <input 
+                  type="text" 
+                  value={formData.contractURL}
+                  onChange={e => setFormData({...formData, contractURL: e.target.value})}
+                  className="w-full px-4 py-3 bg-agency-bg border border-agency-border rounded-xl text-sm font-bold focus:outline-none focus:border-agency-accent transition-all"
+                  placeholder="https://docs.google.com/..."
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="p-6 border-t border-agency-border bg-agency-bg/30 flex gap-4">
+          <button 
+            onClick={onClose}
+            className="flex-1 px-4 py-3 border border-agency-border rounded-xl text-xs font-bold uppercase tracking-widest text-agency-muted hover:bg-white transition-all"
+          >
+            Abort
+          </button>
+          <button 
+            onClick={() => onSave(formData as Client)}
+            className="flex-1 px-4 py-3 bg-agency-accent text-white rounded-xl text-xs font-bold uppercase tracking-widest shadow-xl shadow-agency-accent/20 hover:scale-[1.02] transition-all"
+          >
+            Commit Shard
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
+const TeamMemberModal = ({ 
+  isOpen, 
+  onClose, 
+  onSave, 
+  member 
+}: { 
+  isOpen: boolean, 
+  onClose: () => void, 
+  onSave: (tm: TeamMember) => void,
+  member: TeamMember | null
+}) => {
+  const [formData, setFormData] = useState<Partial<TeamMember>>(
+    member || { 
+      name: '', 
+      email: '', 
+      role: 'Strategist', 
+      status: 'online',
+      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=800&auto=format&fit=crop&q=60'
+    }
+  );
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 text-agency-ink">
+      <motion.div 
+        initial={{ opacity: 0 }} 
+        animate={{ opacity: 1 }} 
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="absolute inset-0 bg-agency-ink/80 backdrop-blur-sm" 
+      />
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden border border-agency-border"
+      >
+        <div className="p-6 border-b border-agency-border flex justify-between items-center bg-agency-bg/50">
+          <h3 className="text-xl font-bold font-display uppercase tracking-tight">
+            {member ? 'Update Team Entity' : 'Manifest New Intelligence'}
+          </h3>
+          <button onClick={onClose} className="p-2 hover:bg-agency-bg rounded-xl transition-colors">
+            <X className="w-5 h-5 text-agency-muted" />
+          </button>
+        </div>
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="block text-[10px] font-black uppercase tracking-widest text-agency-muted mb-1.5">Intelligence Handle (Name)</label>
+            <input 
+              type="text" 
+              value={formData.name}
+              onChange={e => setFormData({...formData, name: e.target.value})}
+              className="w-full px-4 py-3 bg-agency-bg border border-agency-border rounded-xl text-sm font-bold focus:outline-none focus:border-agency-accent transition-all"
+              placeholder="Sarah Connor"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-black uppercase tracking-widest text-agency-muted mb-1.5">Secure Email Protocol</label>
+            <input 
+              type="email" 
+              value={formData.email}
+              onChange={e => setFormData({...formData, email: e.target.value})}
+              className="w-full px-4 py-3 bg-agency-bg border border-agency-border rounded-xl text-sm font-bold focus:outline-none focus:border-agency-accent transition-all"
+              placeholder="sarah@agency.com"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-agency-muted mb-1.5">Operational Role</label>
+              <select 
+                value={formData.role}
+                onChange={e => setFormData({...formData, role: e.target.value as any})}
+                className="w-full px-4 py-3 bg-agency-bg border border-agency-border rounded-xl text-sm font-bold focus:outline-none focus:border-agency-accent appearance-none transition-all"
+              >
+                <option value="Admin">Admin</option>
+                <option value="Strategist">Strategist</option>
+                <option value="Creative">Creative</option>
+                <option value="Technical">Technical</option>
+                <option value="Account Manager">Account Manager</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-agency-muted mb-1.5">Initial Status</label>
+              <select 
+                value={formData.status}
+                onChange={e => setFormData({...formData, status: e.target.value as any})}
+                className="w-full px-4 py-3 bg-agency-bg border border-agency-border rounded-xl text-sm font-bold focus:outline-none focus:border-agency-accent appearance-none transition-all"
+              >
+                <option value="online">Online</option>
+                <option value="busy">Busy</option>
+                <option value="offline">Offline</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="block text-[10px] font-black uppercase tracking-widest text-agency-muted mb-1.5">Avatar Vector (URL)</label>
+            <input 
+              type="text" 
+              value={formData.avatar}
+              onChange={e => setFormData({...formData, avatar: e.target.value})}
+              className="w-full px-4 py-3 bg-agency-bg border border-agency-border rounded-xl text-xs font-mono focus:outline-none focus:border-agency-accent transition-all"
+            />
+          </div>
+        </div>
+        <div className="p-6 border-t border-agency-border bg-agency-bg/30 flex gap-4">
+          <button 
+            onClick={onClose}
+            className="flex-1 px-4 py-3 border border-agency-border rounded-xl text-xs font-bold uppercase tracking-widest text-agency-muted hover:bg-white transition-all"
+          >
+            Purge
+          </button>
+          <button 
+            onClick={() => onSave(formData as TeamMember)}
+            className="flex-1 px-4 py-3 bg-agency-accent text-white rounded-xl text-xs font-bold uppercase tracking-widest shadow-xl shadow-agency-accent/20 hover:scale-[1.02] transition-all"
+          >
+            Deploy Entity
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
 };
 
 export default function App() {
@@ -10655,6 +10751,12 @@ export default function App() {
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [clients, setClients] = useState<Client[]>(CLIENTS);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>(TEAM_MEMBERS);
+  const [isClientModalOpen, setIsClientModalOpen] = useState(false);
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
+  const [editingTeamMember, setEditingTeamMember] = useState<TeamMember | null>(null);
   const [logs, setLogs] = useState<SystemLog[]>(SYSTEM_LOGS);
   const [isActionModalOpen, setIsActionModalOpen] = useState(false);
   const [personas, setPersonas] = useState<Persona[]>(PERSONAS);
@@ -10811,6 +10913,60 @@ export default function App() {
     } finally {
       setIsMediaSyncing(false);
     }
+  };
+
+  const handleAddClient = () => {
+    setEditingClient(null);
+    setIsClientModalOpen(true);
+  };
+
+  const handleEditClient = (client: Client) => {
+    setEditingClient(client);
+    setIsClientModalOpen(true);
+  };
+
+  const handleDeleteClient = (id: string) => {
+    setClients(prev => prev.filter(c => c.id !== id));
+    addNotification('Client record purged from neural storage', 'warning');
+  };
+
+  const handleSaveClient = (client: Client) => {
+    if (editingClient) {
+      setClients(prev => prev.map(c => c.id === client.id ? client : c));
+      addNotification(`Client ${client.name} profile calibrated`, 'success');
+    } else {
+      const newClient = { ...client, id: Math.random().toString(36).substring(7), lastActivity: new Date().toISOString() };
+      setClients(prev => [...prev, newClient]);
+      addNotification(`New client logic shard initialized: ${client.name}`, 'success');
+    }
+    setIsClientModalOpen(false);
+  };
+
+  const handleAddTeam = () => {
+    setEditingTeamMember(null);
+    setIsTeamModalOpen(true);
+  };
+
+  const handleEditTeam = (tm: TeamMember) => {
+    setEditingTeamMember(tm);
+    setIsTeamModalOpen(true);
+  };
+
+  const handleDeleteTeam = (id: string) => {
+    setTeamMembers(prev => prev.filter(tm => tm.id !== id));
+    addNotification('Team member access revoked', 'warning');
+  };
+
+  const handleSaveTeam = (tm: TeamMember) => {
+    if (editingTeamMember) {
+      setTeamMembers(prev => prev.map(t => t.id === tm.id ? tm : t));
+      addNotification(`Team member ${tm.name} permissions updated`, 'success');
+    } else {
+      const newMember = { ...tm, id: Math.random().toString(36).substring(7), lastActive: 'Just now' };
+      setTeamMembers(prev => [...prev, newMember]);
+      addNotification(`New team intelligence entity deployed: ${tm.name}`, 'success');
+    }
+    setIsTeamModalOpen(false);
   };
 
   // --- Step 4/5: Campaign & Asset Generation ---
@@ -11029,7 +11185,7 @@ export default function App() {
           <SidebarItem icon={Users2} label="Collaboration" active={activeTab === 'collaboration'} onClick={() => setActiveTab('collaboration')} />
           
           <div className="pt-4 pb-2 px-4 text-[10px] font-bold uppercase tracking-widest text-white/40">Tenant Ops</div>
-          <SidebarItem icon={Building2} label="Agency Config" active={activeTab === 'agency-config'} onClick={() => setActiveTab('agency-config')} />
+          <SidebarItem icon={CreditCard} label="User Subscription" active={activeTab === 'subscription'} onClick={() => setActiveTab('subscription')} />
           <SidebarItem icon={Mail} label="Secured Dispatch" active={activeTab === 'email-dispatch'} onClick={() => setActiveTab('email-dispatch')} />
           <SidebarItem icon={UserCheck} label="Email Approvals" active={activeTab === 'email-approvals'} onClick={() => setActiveTab('email-approvals')} />
           <SidebarItem icon={BarChart3} label="Email Tracking" active={activeTab === 'email-tracking'} onClick={() => setActiveTab('email-tracking')} />
@@ -11154,7 +11310,15 @@ export default function App() {
                 <Route path="/vibe-library" element={<VibeLibraryView onAction={addNotification} templates={agencyTemplates} setTemplates={setAgencyTemplates} />} />
                 <Route path="/approvals" element={<ApprovalsView onAction={addNotification} deliverables={deliverablesData} setDeliverables={setDeliverablesData} />} />
                 <Route path="/personas" element={<PersonasView onAction={addNotification} personas={personas} setPersonas={setPersonas} />} />
-                <Route path="/collaboration" element={<CollaborationView onAction={addNotification} />} />
+                <Route path="/collaboration" element={
+                  <CollaborationView 
+                    onAction={addNotification} 
+                    teamMembers={teamMembers}
+                    onAddTeam={handleAddTeam}
+                    onEditTeam={handleEditTeam}
+                    onDeleteTeam={handleDeleteTeam}
+                  />
+                } />
                 <Route path="/media" element={
                   <MediaCenterView 
                     onAction={addNotification} 
@@ -11168,17 +11332,18 @@ export default function App() {
                     onDeploy={deployCampaignToPlatforms}
                   />
                 } />
-                <Route path="/clients" element={<ClientsView onAction={addNotification} />} />
-                <Route path="/agency-config" element={
-                  <AgencyConfigView 
+                <Route path="/clients" element={
+                  <ClientsView 
+                    clients={clients} 
                     onAction={addNotification} 
-                    branding={branding} 
-                    setBranding={setBranding}
-                    subscription={subscription}
-                    setSubscription={setSubscription}
-                    onProvision={provisionTenant}
-                    isProvisioning={isProvisioning}
-                    tenantId={tenantId}
+                    onAdd={handleAddClient}
+                    onEdit={handleEditClient}
+                    onDelete={handleDeleteClient}
+                  />
+                } />
+                <Route path="/subscription" element={
+                  <UserSubscriptionView 
+                    onAction={addNotification} 
                   />
                 } />
                 <Route path="/pricing" element={<PricingView onAction={addNotification} />} />
@@ -11201,7 +11366,7 @@ export default function App() {
         <footer className="mt-auto p-8 border-t border-agency-border bg-white flex justify-between items-center text-[10px] uppercase tracking-widest font-bold text-agency-muted">
           <div className="flex items-center gap-4">
             <span>&copy; 2026 {branding.agencyName}</span>
-            <span className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200">{subscription.name} Plane</span>
+            <span className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200">{subscription.name} Plan</span>
           </div>
           <div className="flex gap-6">
             <a href="#" className="flex items-center gap-1"><FileJson className="w-3 h-3" /> A2A Spec</a>
@@ -11210,6 +11375,19 @@ export default function App() {
           </div>
         </footer>
       </main>
+
+      <ClientModal 
+        isOpen={isClientModalOpen} 
+        onClose={() => setIsClientModalOpen(false)}
+        onSave={handleSaveClient}
+        client={editingClient}
+      />
+      <TeamMemberModal
+        isOpen={isTeamModalOpen}
+        onClose={() => setIsTeamModalOpen(false)}
+        onSave={handleSaveTeam}
+        member={editingTeamMember}
+      />
     </div>
   );
 }

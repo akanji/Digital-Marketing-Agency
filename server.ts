@@ -1160,8 +1160,26 @@ async function startServer() {
     highRiskTypes: ['marketing', 'reporting', 'legal', 'financial'],
     dailyLimit: 50000,
     mfaEnabled: true,
-    defaultCompliance: { gdpr: true, ccpa: true, can_spam: true }
+    defaultCompliance: { gdpr: true, ccpa: true, can_spam: true },
+    emailSignature: "--\nBest regards,\nAgencyOS Dispatcher"
   };
+
+  let emailTemplates: any[] = [
+    { 
+      id: 'template-1', 
+      name: 'Generic Greeting', 
+      subject: 'Welcome to AgencyOS', 
+      body: 'Hello,\n\nWelcome to the next generation of agency operations.\n\nBest,\nTeam',
+      category: 'onboarding'
+    },
+    { 
+      id: 'template-2', 
+      name: 'Client Report Header', 
+      subject: 'Performance Audit: [Client Name]', 
+      body: 'Dear [Client],\n\nPlease find the attached quarterly audit report for your review.\n\nRegards,\n[Signer Name]',
+      category: 'reporting'
+    }
+  ];
 
   app.post('/api/v1/email/dispatch', async (req, res) => {
     const { to, subject, encryption, compliance, body, type, scheduled_at } = req.body;
@@ -1360,6 +1378,29 @@ async function startServer() {
     });
 
     res.json({ success: true, settings: secureDispatchSettings });
+  });
+
+  app.get('/api/v1/email/templates', (req, res) => {
+    res.json({ templates: emailTemplates });
+  });
+
+  app.post('/api/v1/email/templates', (req, res) => {
+    const { template } = req.body;
+    if (!template.name || !template.body) {
+      return res.status(400).json({ error: 'Template name and body required' });
+    }
+    const newTemplate = {
+      ...template,
+      id: `template-${Date.now()}`
+    };
+    emailTemplates.push(newTemplate);
+    res.json({ template: newTemplate });
+  });
+
+  app.delete('/api/v1/email/templates/:id', (req, res) => {
+    const { id } = req.params;
+    emailTemplates = emailTemplates.filter(t => t.id !== id);
+    res.json({ success: true });
   });
 
   app.post('/api/v1/email/dispatch/:id/cancel', (req, res) => {
