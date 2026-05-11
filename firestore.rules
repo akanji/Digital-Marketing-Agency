@@ -1,86 +1,262 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // 0. Global Safety Net: Default Deny
-    match /{document=**} {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: /users/{userId}
+    // Document ID: userId (UID)
+    // Fields:
+    //   - uid: string (required) - Firebase Auth UID
+    //   - displayName: string (optional) - User's full name
+    //   - email: string (required, email format) - User's email
+    //   - photoURL: string (optional, URL format) - User's profile picture URL
+    //   - role: string (required, enum: ["user", "admin"]) - User role
+    //   - isVerified: bool (required) - Whether identity is verified
+    //   - createdAt: timestamp (required) - Account creation date
+    //
+    // Collection: /users/{userId}/progress/{domainId}
+    // Document ID: domainId (string)
+    // Fields:
+    //   - userId: string (required) - UID of the user
+    //   - domainId: string (required) - ID of the course domain
+    //   - completedLessons: list (required) - Indices of completed lessons
+    //   - quizScore: int (optional) - Highest quiz score achieved
+    //   - lastUpdated: timestamp (required) - Last update timestamp
+    //
+    // Collection: /users/{userId}/quizAttempts/{attemptId}
+    // Document ID: attemptId (string)
+    // Fields:
+    //   - userId: string (required) - UID of the user
+    //   - domainId: string (required) - ID of the course domain
+    //   - score: int (required) - Score achieved (0-100)
+    //   - timestamp: timestamp (required) - When the quiz was taken
+    //
+    // Collection: /certificates/{certId}
+    // Document ID: certId (string)
+    // Fields:
+    //   - userId: string (required) - UID of the recipient
+    //   - userName: string (required) - Name on the certificate
+    //   - certId: string (required) - Unique certificate ID
+    //   - issuedAt: timestamp (required) - Date of issuance
+    //   - verificationUrl: string (required) - URL to verify the certificate
+    //
+    // Collection: /verifications/{userId}
+    // Document ID: userId (UID)
+    // Fields:
+    //   - userId: string (required) - UID of the user
+    //   - fullName: string (required) - Legal full name
+    //   - idPhotoUrl: string (required, URL format) - URL of the uploaded ID photo
+    //   - selfieUrl: string (required, URL format) - URL of the uploaded selfie
+    //   - status: string (required, enum: ["pending", "approved", "rejected"]) - Verification status
+    //   - submittedAt: timestamp (required) - Submission date
+    //
+    // Collection: /quizzes/{domainId}
+    // Document ID: domainId (string)
+    // Fields:
+    //   - domainId: string (required) - ID of the course domain
+    //   - questions: list (required) - List of quiz questions
+    //   - generatedAt: timestamp (required) - When the quiz was generated
+    //   - version: int (optional) - Version number
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        ((exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+          (request.auth.token.email == "phidephefem@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUrl(url) {
+      return url is string && (url.matches("^https://.*") || url.matches("^http://.*"));
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasRequiredFields(['uid', 'email', 'role', 'isVerified', 'createdAt']) &&
+             hasOnlyAllowedFields(['uid', 'displayName', 'email', 'photoURL', 'role', 'isVerified', 'createdAt', 'subscription']) &&
+             data.uid == request.auth.uid &&
+             isValidEmail(data.email) &&
+             (!('displayName' in data) || (data.displayName is string && data.displayName.size() < 100)) &&
+             (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() < 500)) &&
+             data.role in ['user', 'admin'] &&
+             data.isVerified is bool &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidProgress(data, domainId) {
+      return hasRequiredFields(['userId', 'domainId', 'completedLessons', 'lastUpdated']) &&
+             hasOnlyAllowedFields(['userId', 'domainId', 'completedLessons', 'quizScore', 'lastUpdated']) &&
+             data.userId == request.auth.uid &&
+             data.domainId == domainId &&
+             data.completedLessons is list &&
+             data.completedLessons.size() <= 100 &&
+             (!('quizScore' in data) || (data.quizScore is int && data.quizScore >= 0 && data.quizScore <= 100)) &&
+             data.lastUpdated is timestamp;
+    }
+
+    function isValidQuizAttempt(data) {
+      return hasRequiredFields(['userId', 'domainId', 'score', 'timestamp']) &&
+             hasOnlyAllowedFields(['userId', 'domainId', 'score', 'timestamp']) &&
+             data.userId == request.auth.uid &&
+             data.domainId is string && data.domainId.size() < 50 &&
+             data.score is int && data.score >= 0 && data.score <= 100 &&
+             data.timestamp is timestamp;
+    }
+
+    function isValidCertificate(data) {
+      return hasRequiredFields(['userId', 'userName', 'certId', 'issuedAt', 'verificationUrl']) &&
+             hasOnlyAllowedFields(['userId', 'userName', 'certId', 'issuedAt', 'verificationUrl']) &&
+             data.userName is string && data.userName.size() < 100 &&
+             data.certId is string &&
+             data.issuedAt is timestamp &&
+             isValidUrl(data.verificationUrl);
+    }
+
+    function isValidVerification(data) {
+      return hasRequiredFields(['userId', 'fullName', 'idPhotoUrl', 'selfieUrl', 'status', 'submittedAt']) &&
+             hasOnlyAllowedFields(['userId', 'fullName', 'idPhotoUrl', 'selfieUrl', 'status', 'submittedAt']) &&
+             data.userId == request.auth.uid &&
+             data.fullName is string && data.fullName.size() < 100 &&
+             isValidUrl(data.idPhotoUrl) &&
+             isValidUrl(data.selfieUrl) &&
+             data.status in ['pending', 'approved', 'rejected'] &&
+             data.submittedAt is timestamp;
+    }
+
+    function isValidQuiz(data, domainId) {
+      return hasRequiredFields(['domainId', 'questions', 'generatedAt']) &&
+             hasOnlyAllowedFields(['domainId', 'questions', 'generatedAt', 'version']) &&
+             data.domainId == domainId &&
+             data.questions is list &&
+             data.questions.size() > 0 &&
+             data.generatedAt is timestamp;
+    }
+
+    function isValidCourseContent(data) {
+      return hasRequiredFields(['domainId', 'level', 'syllabus', 'generatedAt']) &&
+             hasOnlyAllowedFields(['domainId', 'level', 'syllabus', 'slides', 'generatedAt']) &&
+             data.domainId is string &&
+             data.level in ['standard', 'advanced'] &&
+             data.syllabus is string && data.syllabus.size() > 0 &&
+             (!('slides' in data) || (data.slides is list && data.slides.size() <= 100)) &&
+             data.generatedAt is timestamp;
+    }
+
+    function isValidGeneratedVideo(data) {
+      return hasRequiredFields(['domainId', 'level', 'videoUrl', 'generatedAt']) &&
+             hasOnlyAllowedFields(['domainId', 'level', 'videoUrl', 'thumbnailUrl', 'transcript', 'generatedAt', 'title']) &&
+             data.domainId is string &&
+             data.level in ['standard', 'advanced'] &&
+             (isValidUrl(data.videoUrl) || (data.videoUrl is string && data.videoUrl.matches("^gs://.*"))) &&
+             (!('thumbnailUrl' in data) || isValidUrl(data.thumbnailUrl)) &&
+             (!('transcript' in data) || (data.transcript is string && data.transcript.size() < 50000)) &&
+             (!('title' in data) || (data.title is string && data.title.size() < 200)) &&
+             data.generatedAt is timestamp;
+    }
+
+    function isValidAIPowerAsset(data) {
+      return hasRequiredFields(['catId', 'itemId', 'toolId', 'content', 'generatedAt']) &&
+             hasOnlyAllowedFields(['catId', 'itemId', 'toolId', 'content', 'generatedAt']) &&
+             data.catId is string &&
+             data.itemId is string &&
+             data.toolId in ['canva', 'slides', 'video'] &&
+             data.generatedAt is timestamp;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /test/connection {
+      allow read: if true;
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == 'user';
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == resource.data.role && request.resource.data.isVerified == resource.data.isVerified;
+      allow update: if isAdmin();
+
+      match /progress/{domainId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create, update: if isOwner(userId) && isValidProgress(request.resource.data, domainId);
+      }
+
+      match /quizAttempts/{attemptId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if isOwner(userId) && isValidQuizAttempt(request.resource.data);
+      }
+    }
+
+    match /certificates/{certId} {
+      allow read: if true; // Publicly verifiable
+      allow create: if isAdmin() && isValidCertificate(request.resource.data);
+      allow update, delete: if isAdmin();
+    }
+
+    match /verifications/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isValidVerification(request.resource.data) && request.resource.data.status == 'pending';
+      allow update: if isAdmin() && isValidVerification(request.resource.data);
+    }
+
+    match /quizzes/{domainId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAdmin() && isValidQuiz(request.resource.data, domainId);
+      allow delete: if isAdmin();
+    }
+
+    match /courseContents/{contentId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAdmin() && isValidCourseContent(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /generatedVideos/{videoId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAdmin() && isValidGeneratedVideo(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /aiPowerAssets/{assetId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAdmin() && isValidAIPowerAsset(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // Default deny
+    match /{path=**} {
       allow read, write: if false;
-    }
-
-    // --- Helpers ---
-    function isSignedIn() { return request.auth != null; }
-    function isEmailVerified() { return request.auth.token.email_verified == true; }
-    function isAdmin() { 
-      // Identity check against team collection for priority role
-      return isSignedIn() && (
-        get(/databases/$(database)/documents/team/$(request.auth.uid)).data.role == 'Admin' ||
-        request.auth.token.email == 'phidephefem@gmail.com'
-      );
-    }
-    function isOwner(userId) { return request.auth.uid == userId; }
-    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
-    function incoming() { return request.resource.data; }
-    function existing() { return resource.data; }
-
-    // --- Validation Blueprints ---
-    function isValidClient(data) {
-      return data.keys().hasAll(['id', 'name', 'contactEmail', 'status']) &&
-             data.id is string && data.id.size() <= 128 &&
-             data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
-             data.contactEmail is string && data.contactEmail.size() <= 256 &&
-             data.status in ['active', 'onboarding', 'churned'];
-    }
-
-    function isValidTeamMember(data) {
-      return data.keys().hasAll(['id', 'name', 'email', 'role']) &&
-             data.id == request.auth.uid &&
-             data.name is string && data.name.size() <= 100 &&
-             data.email == request.auth.token.email &&
-             data.role in ['Admin', 'Strategist', 'Creative', 'Technical', 'Account Manager'];
-    }
-
-    function isValidDispatch(data) {
-      return data.keys().hasAll(['id', 'to', 'subject', 'status', 'timestamp']) &&
-             data.id is string &&
-             data.to is string &&
-             data.subject is string &&
-             data.status in ['sent', 'failed', 'processing', 'delivered', 'bounced', 'cancelled', 'scheduled'];
-    }
-
-    // --- Collection Rules ---
-
-    // Team Members
-    match /team/{memberId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn() && isEmailVerified() && isValidTeamMember(incoming()) && isValidId(memberId);
-      allow update: if isSignedIn() && isEmailVerified() && (
-        // Admin can update anything
-        (isAdmin() && isValidTeamMember(incoming())) ||
-        // User can update their own profile but NOT their role
-        (isOwner(memberId) && isValidTeamMember(incoming()) && incoming().role == existing().role)
-      );
-      allow delete: if isAdmin();
-    }
-
-    // Clients
-    match /clients/{clientId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn() && (isAdmin() || resource.data.status == 'active'); 
-      allow create: if isAdmin() && isValidClient(incoming()) && isValidId(clientId);
-      allow update: if (isAdmin() || (isSignedIn() && isEmailVerified())) && isValidClient(incoming()) && (
-        isAdmin() || (incoming().diff(existing()).affectedKeys().hasOnly(['status', 'lastActivity']))
-      );
-      allow delete: if isAdmin();
-    }
-
-    // Dispatches (Audit Trail)
-    match /dispatches/{dispatchId} {
-      allow get: if isSignedIn() && (isAdmin() || resource.data.createdBy == request.auth.uid);
-      allow list: if isSignedIn() && (isAdmin() || resource.data.createdBy == request.auth.uid);
-      allow create: if (isAdmin() || isSignedIn()) && isValidDispatch(incoming()) && isValidId(dispatchId);
-      // Dispatches are essentially immutable audit logs
-      allow update: if isAdmin() && isValidDispatch(incoming());
-      allow delete: if false; // Audit logs should never be deleted
     }
   }
 }
