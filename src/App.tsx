@@ -6337,7 +6337,6 @@ const SocialMediaView = ({ onAction }: { onAction: (name: string, type?: string)
       </div>
 
       <AnimatePresence>
-        <AnimatePresence>
         {refiningCampaign && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <motion.div 
@@ -6372,7 +6371,8 @@ const SocialMediaView = ({ onAction }: { onAction: (name: string, type?: string)
         )}
       </AnimatePresence>
 
-      {showNewCampaignModal && (
+      <AnimatePresence>
+        {showNewCampaignModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-agency-ink/60 backdrop-blur-sm">
             <motion.div 
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
