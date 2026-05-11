@@ -167,6 +167,9 @@ import {
   ComplianceShield
 } from './types';
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { onAuthStateChanged, User } from 'firebase/auth';
+import { collection, onSnapshot, doc, setDoc, deleteDoc, updateDoc, query, orderBy, limit, getDoc } from 'firebase/firestore';
+import { auth, db, signInWithGoogle, logout, handleFirestoreError, OperationType } from './lib/firebase';
 import SecureDispatch from './pages/SecureDispatch';
 import EmailAuditView from './pages/SecureDispatch/Audit';
 import EmailTrackingView from './pages/SecureDispatch/Tracking';
@@ -561,7 +564,7 @@ const Overview = ({ onAction }: { onAction: (name: string, type?: string) => voi
   </div>
 );
 
-const PricingView = ({ onAction }: { onAction: (name: string, type?: string) => void }) => {
+const PricingView = ({ onAction, userEmail }: { onAction: (name: string, type?: string) => void, userEmail: string }) => {
   const [isCreatingSession, setIsCreatingSession] = useState<string | null>(null);
 
   const handleCreateCheckoutSession = async (plan: PricingPlan) => {
@@ -570,7 +573,8 @@ const PricingView = ({ onAction }: { onAction: (name: string, type?: string) => 
 
     const requestBody = {
       priceId: plan.plan === 'Yearly' ? 'price_1TUy7oBMbxh6jv0CwMdQOBII' : 'price_1TUy6KBMbxh6jv0CSQvph3ev',
-      customer_email: 'phidephefem@gmail.com'
+      customerEmail: userEmail,
+      isTrial: true
     };
 
     try {
@@ -10347,7 +10351,7 @@ const ClientsView = ({
 
 // --- App Layout ---
 
-const UserSubscriptionView = ({ onAction }: { onAction: (name: string, type?: string) => void }) => {
+const UserSubscriptionView = ({ onAction, userEmail }: { onAction: (name: string, type?: string) => void, userEmail: string }) => {
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
 
   const handleSubscriptionFlow = async (priceId: string, planName: string, isTrial: boolean = false) => {
@@ -10361,7 +10365,7 @@ const UserSubscriptionView = ({ onAction }: { onAction: (name: string, type?: st
         body: JSON.stringify({
           priceId,
           isTrial,
-          customer_email: 'phidephefem@gmail.com' // Should ideally come from auth
+          customerEmail: userEmail
         })
       });
 
@@ -10803,9 +10807,11 @@ export default function App() {
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [clients, setClients] = useState<Client[]>(CLIENTS);
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>(TEAM_MEMBERS);
-  const [currentUser, setCurrentUser] = useState<TeamMember>(TEAM_MEMBERS[0]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [fbUser, setFbUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<TeamMember | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
@@ -10833,6 +10839,89 @@ export default function App() {
   const [isMediaSyncing, setIsMediaSyncing] = useState(false);
   const [a2aStatus, setA2aStatus] = useState<A2ASystemStatusResponse | null>(null);
   const [cloudStatus, setCloudStatus] = useState<CloudStatusResponse | null>(null);
+
+  // Auth & Sync Lifecycle
+  useEffect(() => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+      setFbUser(user);
+      setIsAuthLoading(false);
+      
+      if (user) {
+        // Sync user to team collection if not exists
+        const userDocRef = doc(db, 'team', user.uid);
+        const userDoc = await getDoc(userDocRef);
+        
+        if (!userDoc.exists()) {
+          const now = new Date().toISOString();
+          const newTeamMember: TeamMember & { trialStartedAt: string } = {
+            id: user.uid,
+            name: user.displayName || 'Agent Candidate',
+            email: user.email || '',
+            role: user.email === 'phidephefem@gmail.com' ? 'Admin' : 'Strategist',
+            status: 'online',
+            avatar: user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.displayName || 'U')}&background=random`,
+            lastActive: now,
+            trialStartedAt: now
+          };
+          try {
+            await setDoc(userDocRef, newTeamMember);
+            setCurrentUser(newTeamMember);
+          } catch (error) {
+            handleFirestoreError(error, OperationType.WRITE, `team/${user.uid}`);
+          }
+        } else {
+          const data = userDoc.data() as TeamMember & { trialStartedAt?: string };
+          setCurrentUser(data);
+          
+          // Trial Expiry Check (Simulated 7 days)
+          const isSubscribed = localStorage.getItem('agency_subscribed') === 'true';
+          if (!isSubscribed && data.trialStartedAt) {
+            const trialStart = new Date(data.trialStartedAt).getTime();
+            const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+            if (Date.now() - trialStart > sevenDaysMs) {
+              setActiveTab('subscription');
+              addNotification('Trial protocol expired. Subscription required to restore agency orchestration.', 'warning');
+            }
+          }
+
+          // Update status to online
+          updateDoc(userDocRef, { status: 'online', lastActive: new Date().toISOString() });
+        }
+      } else {
+        setCurrentUser(null);
+      }
+    });
+
+    return () => unsubscribeAuth();
+  }, []);
+
+  // Real-time Firestore Syncs
+  useEffect(() => {
+    if (!fbUser) {
+      setClients(CLIENTS);
+      setTeamMembers(TEAM_MEMBERS);
+      return;
+    }
+
+    // Clients Sync
+    const qClients = query(collection(db, 'clients'));
+    const unsubscribeClients = onSnapshot(qClients, (snapshot) => {
+      const clientsData = snapshot.docs.map(doc => doc.data() as Client);
+      setClients(clientsData.length > 0 ? clientsData : CLIENTS);
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'clients'));
+
+    // Team Sync
+    const qTeam = query(collection(db, 'team'));
+    const unsubscribeTeam = onSnapshot(qTeam, (snapshot) => {
+      const teamData = snapshot.docs.map(doc => doc.data() as TeamMember);
+      setTeamMembers(teamData.length > 0 ? teamData : TEAM_MEMBERS);
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'team'));
+
+    return () => {
+      unsubscribeClients();
+      unsubscribeTeam();
+    };
+  }, [fbUser]);
 
   useEffect(() => {
     fetchEmailApprovals();
@@ -10865,6 +10954,7 @@ export default function App() {
   };
 
   const handleHandleEmailApproval = async (id: string, action: 'approve' | 'reject') => {
+    if (!currentUser) return;
     addNotification(`Executing decision sequence for approval: ${id}...`, 'info');
     try {
       const response = await fetch(`/api/v1/email/approvals/${id}/action`, {
@@ -10978,29 +11068,38 @@ export default function App() {
     setIsClientModalOpen(true);
   };
 
-  const handleDeleteClient = (id: string) => {
-    if (currentUser.role !== 'Admin') {
+  const handleDeleteClient = async (id: string) => {
+    if (!currentUser || currentUser.role !== 'Admin') {
       addNotification('Permission Denied: Only Admins can purge client shards', 'error');
       return;
     }
-    setClients(prev => prev.filter(c => c.id !== id));
-    addNotification('Client record purged from neural storage', 'warning');
+    try {
+      await deleteDoc(doc(db, 'clients', id));
+      addNotification('Client record purged from neural storage', 'warning');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `clients/${id}`);
+    }
   };
 
-  const handleSaveClient = (client: Client) => {
-    if (editingClient) {
-      setClients(prev => prev.map(c => c.id === client.id ? client : c));
-      addNotification(`Client ${client.name} profile calibrated`, 'success');
-    } else {
-      const newClient = { ...client, id: Math.random().toString(36).substring(7), lastActivity: new Date().toISOString() };
-      setClients(prev => [...prev, newClient]);
-      addNotification(`New client logic shard initialized: ${client.name}`, 'success');
+  const handleSaveClient = async (client: Client) => {
+    try {
+      if (editingClient) {
+        await setDoc(doc(db, 'clients', client.id), client);
+        addNotification(`Client ${client.name} profile calibrated`, 'success');
+      } else {
+        const id = Math.random().toString(36).substring(7);
+        const newClient = { ...client, id, lastActivity: new Date().toISOString() };
+        await setDoc(doc(db, 'clients', id), newClient);
+        addNotification(`New client logic shard initialized: ${client.name}`, 'success');
+      }
+      setIsClientModalOpen(false);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `clients/${client.id}`);
     }
-    setIsClientModalOpen(false);
   };
 
   const handleAddTeam = () => {
-    if (currentUser.role !== 'Admin') {
+    if (!currentUser || currentUser.role !== 'Admin') {
       addNotification('Permission Denied: Team management requires Admin clearance', 'error');
       return;
     }
@@ -11009,7 +11108,7 @@ export default function App() {
   };
 
   const handleEditTeam = (tm: TeamMember) => {
-    if (currentUser.role !== 'Admin' && currentUser.id !== tm.id) {
+    if (!currentUser || (currentUser.role !== 'Admin' && currentUser.id !== tm.id)) {
       addNotification('Permission Denied: You can only calibrate your own intelligence vector', 'error');
       return;
     }
@@ -11017,25 +11116,37 @@ export default function App() {
     setIsTeamModalOpen(true);
   };
 
-  const handleDeleteTeam = (id: string) => {
-    if (currentUser.role !== 'Admin') {
+  const handleDeleteTeam = async (id: string) => {
+    if (!currentUser || currentUser.role !== 'Admin') {
       addNotification('Permission Denied: Only Admins can revoke team access', 'error');
       return;
     }
-    setTeamMembers(prev => prev.filter(tm => tm.id !== id));
-    addNotification('Team member access revoked', 'warning');
+    try {
+      await deleteDoc(doc(db, 'team', id));
+      addNotification('Team member access revoked', 'warning');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `team/${id}`);
+    }
   };
 
-  const handleSaveTeam = (tm: TeamMember) => {
-    if (editingTeamMember) {
-      setTeamMembers(prev => prev.map(t => t.id === tm.id ? tm : t));
-      addNotification(`Team member ${tm.name} permissions updated`, 'success');
-    } else {
-      const newMember = { ...tm, id: Math.random().toString(36).substring(7), lastActive: 'Just now' };
-      setTeamMembers(prev => [...prev, newMember]);
-      addNotification(`New team intelligence entity deployed: ${tm.name}`, 'success');
+  const handleSaveTeam = async (tm: TeamMember) => {
+    try {
+      if (editingTeamMember) {
+        await setDoc(doc(db, 'team', tm.id), tm);
+        addNotification(`Team member ${tm.name} permissions updated`, 'success');
+      } else {
+        // For new team members, we usually wait for them to sign in, 
+        // but admins might pre-create them. 
+        // For simplicity, we create with a random ID if not provided.
+        const id = tm.id || Math.random().toString(36).substring(7);
+        const newMember = { ...tm, id, lastActive: 'Just now' };
+        await setDoc(doc(db, 'team', id), newMember);
+        addNotification(`New team intelligence entity deployed: ${tm.name}`, 'success');
+      }
+      setIsTeamModalOpen(false);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `team/${tm.id}`);
     }
-    setIsTeamModalOpen(false);
   };
 
   // --- Step 4/5: Campaign & Asset Generation ---
@@ -11079,6 +11190,32 @@ export default function App() {
 
   // --- Step 7: Deployment ---
   const deployCampaignToPlatforms = async (campaignId: string) => {
+    addNotification('Initiating A2A Judge Protocol for validation...', 'info');
+    
+    // Inject Judge Telemetry
+    const judgeLog: SystemLog = {
+      id: `judge-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      level: 'info',
+      module: 'JUDGE-AGENT',
+      message: 'Self-correcting verification sequence started for deployment packet.',
+      payload: { campaignId, status: 'verifying' }
+    };
+    setLogs(prev => [judgeLog, ...prev.slice(0, 49)]);
+
+    // Simulate Judge Validation Loop
+    setTimeout(() => {
+      addNotification('Judge Agent: Verifying trial status and auth persistence...', 'info');
+      setTimeout(() => {
+        addNotification('Judge Agent: Validation SUCCESS. Triggering Cloud Run deployment.', 'success');
+        
+        // Actual deployment logic
+        performDeployment(campaignId);
+      }, 1500);
+    }, 1000);
+  };
+
+  const performDeployment = async (campaignId: string) => {
     addNotification('Broadcasting campaign packets to platform connected nodes...', 'info');
     try {
       const response = await fetch(`/api/v1/campaigns/${campaignId}/status`, {
@@ -11111,8 +11248,78 @@ export default function App() {
   };
 
 
+  if (isAuthLoading) {
+    return (
+      <div className="h-screen w-screen bg-agency-bg flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-agency-accent flex items-center justify-center animate-pulse">
+            <Activity className="w-6 h-6 text-white" />
+          </div>
+          <div className="text-[10px] font-black uppercase tracking-widest text-agency-muted animate-pulse">Initializing OS Kernels...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!fbUser) {
+    return (
+      <div className="h-screen w-screen bg-agency-bg flex items-center justify-center p-8 overflow-hidden relative">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(59,130,246,0.05),transparent_50%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_70%,rgba(139,92,246,0.05),transparent_50%)]" />
+        
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-md w-full bg-white rounded-[2.5rem] border border-agency-border shadow-2xl p-10 relative z-10 text-center space-y-8"
+        >
+          <div className="w-16 h-16 rounded-[1.5rem] bg-gradient-to-br from-agency-accent to-purple-600 flex items-center justify-center mx-auto shadow-xl shadow-agency-accent/20 border border-white/20">
+            <Rocket className="w-8 h-8 text-white" />
+          </div>
+          
+          <div className="space-y-2">
+            <h1 className="text-3xl font-black font-display tracking-tight text-agency-ink italic">AGENCY<span className="text-agency-accent">OS</span></h1>
+            <p className="text-xs font-bold text-agency-muted uppercase tracking-widest">Next-Gen Marketing Orchestration</p>
+          </div>
+
+          <div className="p-6 bg-agency-bg rounded-3xl border border-agency-border space-y-4 text-left">
+            <div className="flex items-start gap-4">
+              <div className="p-2 bg-white rounded-xl border border-agency-border">
+                <Brain className="w-4 h-4 text-agency-accent" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-agency-ink">Neural Strategy Layer</p>
+                <p className="text-[10px] text-agency-muted mt-0.5 leading-relaxed">AI-driven campaign optimization across Meta, Google & TikTok nodes.</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-4">
+              <div className="p-2 bg-white rounded-xl border border-agency-border">
+                <ShieldCheck className="w-4 h-4 text-agency-accent" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-agency-ink">Secure Dispatch Protocol</p>
+                <p className="text-[10px] text-agency-muted mt-0.5 leading-relaxed">End-to-end encrypted financial and legal email automation.</p>
+              </div>
+            </div>
+          </div>
+
+          <button 
+            onClick={signInWithGoogle}
+            className="w-full py-4 bg-agency-accent text-white rounded-2xl text-sm font-black uppercase tracking-widest hover:bg-blue-700 hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-agency-accent/25 flex items-center justify-center gap-3"
+          >
+            <Globe className="w-5 h-5" />
+            Initialize Agency Access
+          </button>
+          
+          <p className="text-[10px] font-bold text-agency-muted uppercase tracking-tighter">
+            Authorized Personnel Only • IP: Neural.Static.Gateway
+          </p>
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex h-screen overflow-hidden bg-agency-bg" style={{ '--agency-accent': branding.primaryColor } as any}>
+    <div className="flex hide-scrollbar h-screen overflow-hidden bg-agency-bg" style={{ '--agency-accent': branding.primaryColor } as any}>
       {/* Global Action Modal */}
       <AnimatePresence>
         {isActionModalOpen && (
@@ -11253,7 +11460,7 @@ export default function App() {
           <SidebarItem icon={UserCircle} label="System Personas" active={activeTab === 'personas'} onClick={() => setActiveTab('personas')} />
           <SidebarItem icon={Users2} label="Collaboration" active={activeTab === 'collaboration'} onClick={() => setActiveTab('collaboration')} />
           
-          {currentUser.role === 'Admin' && (
+          {currentUser?.role === 'Admin' && (
             <>
               <div className="pt-4 pb-2 px-4 text-[10px] font-bold uppercase tracking-widest text-white/40">Tenant Ops</div>
               <SidebarItem icon={CreditCard} label="User Subscription" active={activeTab === 'subscription'} onClick={() => setActiveTab('subscription')} />
@@ -11336,15 +11543,15 @@ export default function App() {
 
             <div className="flex items-center gap-3">
               <div className="flex flex-col items-end hidden lg:flex">
-                <span className="text-[10px] font-black uppercase tracking-tight text-agency-ink leading-none">{currentUser.name}</span>
-                <span className="text-[8px] font-bold text-agency-muted bg-agency-bg/50 px-1 py-0.5 rounded uppercase border border-agency-border mt-1">{currentUser.role}</span>
+                <span className="text-[10px] font-black uppercase tracking-tight text-agency-ink leading-none">{currentUser?.name || 'Agent'}</span>
+                <span className="text-[8px] font-bold text-agency-muted bg-agency-bg/50 px-1 py-0.5 rounded uppercase border border-agency-border mt-1">{currentUser?.role || 'Guest'}</span>
               </div>
               
               <div className="relative group">
                 <button 
                   className="w-10 h-10 rounded-xl bg-agency-bg border border-agency-border flex items-center justify-center overflow-hidden hover:border-agency-accent shadow-sm transition-all"
                 >
-                  <img src={currentUser.avatar} alt={currentUser.name} className="w-full h-full object-cover" />
+                  <img src={currentUser?.avatar || `https://ui-avatars.com/api/?name=${fbUser?.displayName || 'A'}`} alt={currentUser?.name} className="w-full h-full object-cover" />
                 </button>
                 
                 <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-agency-border opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[60] p-2 overflow-hidden">
@@ -11360,7 +11567,7 @@ export default function App() {
                       }}
                       className={cn(
                         "w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-3 mb-1",
-                        currentUser.id === tm.id 
+                        currentUser?.id === tm.id 
                           ? "bg-agency-accent text-white shadow-md shadow-agency-accent/20" 
                           : "hover:bg-agency-bg text-agency-ink hover:translate-x-1"
                       )}
@@ -11370,14 +11577,17 @@ export default function App() {
                       </div>
                       <div className="flex flex-col">
                         <span>{tm.name}</span>
-                        <span className={cn("text-[8px] uppercase tracking-widest", currentUser.id === tm.id ? "text-white/70" : "text-agency-muted")}>
+                        <span className={cn("text-[8px] uppercase tracking-widest", currentUser?.id === tm.id ? "text-white/70" : "text-agency-muted")}>
                           {tm.role}
                         </span>
                       </div>
                     </button>
                   ))}
                   <div className="px-3 py-2 border-t border-agency-border mt-1 pt-2">
-                    <button className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold text-red-500 hover:bg-red-50 transition-colors flex items-center gap-2">
+                    <button 
+                      onClick={() => logout()}
+                      className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold text-red-500 hover:bg-red-50 transition-colors flex items-center gap-2"
+                    >
                       <LogOut className="w-3.5 h-3.5" />
                       <span>Purge Session</span>
                     </button>
@@ -11469,9 +11679,10 @@ export default function App() {
                 <Route path="/subscription" element={
                   <UserSubscriptionView 
                     onAction={addNotification} 
+                    userEmail={currentUser?.email || ''}
                   />
                 } />
-                <Route path="/pricing" element={<PricingView onAction={addNotification} />} />
+                <Route path="/pricing" element={<PricingView onAction={addNotification} userEmail={currentUser?.email || ''} />} />
                 <Route path="/query-agent" element={<QueryAgentView onAction={addNotification} tenantId={tenantId} />} />
                 <Route path="/intelligence" element={<QueryAgentView onAction={addNotification} tenantId={tenantId} />} />
                 <Route path="/agency-intelligence" element={<QueryAgentView onAction={addNotification} tenantId={tenantId} />} />

@@ -124,8 +124,10 @@ async function startServer() {
   app.post('/create-checkout-session', express.json(), async (req, res) => {
     try {
       const stripe = getStripe();
-      const { priceId, isTrial } = req.body;
+      const { priceId, isTrial, customerEmail } = req.body;
       const domain = process.env.APP_URL || 'http://localhost:3000';
+
+      console.log(`[Stripe Agent] Initiating Checkout for ${customerEmail}. Logic Gate: ${isTrial ? '7-Day Trial' : 'Direct Sync'}`);
 
       const sessionConfig: Stripe.Checkout.SessionCreateParams = {
         line_items: [
@@ -135,9 +137,16 @@ async function startServer() {
           },
         ],
         mode: 'subscription',
+        customer_email: customerEmail,
         success_url: `${domain}?subscription=success`,
         cancel_url: `${domain}?subscription=canceled`,
         allow_promotion_codes: true,
+        // ENABLED: Pay without Link parameter for compliance/vibe orchestration
+        payment_method_options: {
+          card: {
+            request_three_d_secure: 'any',
+          },
+        },
       };
 
       // If isTrial is requested, add 7 days trial period
