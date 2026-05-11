@@ -717,18 +717,45 @@ export interface ValidationCycle {
   benchmarkScore: number;
 }
 
-export interface Campaign {
+export interface CampaignTargeting {
+  locations?: string[];
+  ageRange?: { min: number; max: number };
+  genders?: ('male' | 'female' | 'all')[];
+  interests?: string[];
+  languages?: string[];
+  platforms?: ('Meta' | 'Google' | 'TikTok' | 'LinkedIn')[];
+}
+
+export interface SentimentResult {
+  score: number; // -1 to 1
+  label: 'Positive' | 'Negative' | 'Neutral';
+  topEmotions: { emotion: string; score: number }[];
+  suggestions: string[];
+}
+
+export interface CampaignPerformanceMetrics {
+  spend: number;
+  impressions: number;
+  clicks: number;
+  conversions: number;
+  ctr: number;
+  roas: number;
+  cpc: number;
+  cpa: number;
+  history: { date: string; spend: number; conversions: number }[];
+}
+
+export interface Campaign extends CampaignPerformanceMetrics {
   id: string;
   name: string;
   platform: 'Google' | 'Meta' | 'TikTok' | 'LinkedIn' | 'Email' | 'Content';
   status: 'active' | 'paused' | 'completed';
-  spend: number;
-  conversion: number;
-  roas: number;
   progress: number;
   startDate: Timestamp | string;
   budget: number;
   pillar: 'online' | 'social' | 'seo' | 'ppc';
+  targeting?: CampaignTargeting;
+  sentiment?: SentimentResult;
 }
 
 export interface AnalyticsData {

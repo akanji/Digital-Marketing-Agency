@@ -119,6 +119,7 @@ import {
   LogOut
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { CampaignRefinement } from './components/CampaignRefinement';
 import { 
   AreaChart, 
   Area, 
@@ -5799,6 +5800,32 @@ const SocialMediaView = ({ onAction }: { onAction: (name: string, type?: string)
     { id: 'fc-2', name: 'Legacy Retargeting', finalRoas: 6.8, conversions: 840, status: 'Completed', platform: 'LinkedIn' },
   ]);
 
+  const [refiningCampaign, setRefiningCampaign] = useState<Campaign | null>(null);
+
+  const startRefining = (c: any) => {
+    // Map MetaCampaign or other to Campaign for the Refinement component
+    const mapped: Campaign = {
+      id: c.id,
+      name: c.name,
+      platform: (c.platform || 'Meta') as any,
+      status: (c.status || 'active') as any,
+      progress: c.progress || 0,
+      startDate: c.startDate || new Date().toISOString(),
+      budget: c.budget?.amount || 0,
+      pillar: 'social',
+      spend: c.performance?.spend || 0,
+      impressions: c.performance?.impressions || 0,
+      clicks: c.performance?.clicks || 0,
+      conversions: c.performance?.conversions || 0,
+      ctr: c.performance?.ctr || 0,
+      roas: c.performance?.roas || 0,
+      cpc: 0,
+      cpa: 0,
+      history: []
+    };
+    setRefiningCampaign(mapped);
+  };
+
   const predictiveData = [
     { day: 'Day 1', roas: 4.2 },
     { day: 'Day 5', roas: 4.5 },
@@ -6135,10 +6162,14 @@ const SocialMediaView = ({ onAction }: { onAction: (name: string, type?: string)
             
             <div className="space-y-4">
               {META_CAMPAIGNS.map((c) => (
-                <div key={c.id} className="p-4 bg-agency-bg rounded-2xl border border-agency-border hover:border-agency-accent/50 transition-all">
+                <div 
+                  key={c.id} 
+                  onClick={() => startRefining(c)}
+                  className="p-4 bg-agency-bg rounded-2xl border border-agency-border hover:border-agency-accent/50 transition-all cursor-pointer group"
+                >
                   <div className="flex justify-between items-start mb-4">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-white rounded-xl border border-agency-border">
+                      <div className="p-2 bg-white rounded-xl border border-agency-border group-hover:border-agency-accent transition-colors">
                         <MetaIcon className="w-4 h-4 text-agency-accent" />
                       </div>
                       <div>
@@ -6306,7 +6337,42 @@ const SocialMediaView = ({ onAction }: { onAction: (name: string, type?: string)
       </div>
 
       <AnimatePresence>
-        {showNewCampaignModal && (
+        <AnimatePresence>
+        {refiningCampaign && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setRefiningCampaign(null)}
+              className="absolute inset-0 bg-agency-ink/60 backdrop-blur-md"
+            />
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="sticky top-0 right-0 p-4 flex justify-end z-10 pointer-events-none">
+                 <button 
+                  onClick={() => setRefiningCampaign(null)} 
+                  className="p-2 bg-white rounded-full shadow-lg border border-agency-border text-agency-muted hover:text-agency-ink pointer-events-auto"
+                 >
+                   <X className="w-5 h-5" />
+                 </button>
+              </div>
+              <CampaignRefinement 
+                campaign={refiningCampaign}
+                onUpdate={(update) => setRefiningCampaign(prev => prev ? { ...prev, ...update } : null)}
+                onAction={onAction}
+              />
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {showNewCampaignModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-agency-ink/60 backdrop-blur-sm">
             <motion.div 
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
