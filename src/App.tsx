@@ -225,42 +225,53 @@ const SidebarItem = ({
   icon: Icon, 
   label, 
   active, 
-  onClick 
+  path
 }: { 
   icon: any, 
   label: string, 
   active: boolean, 
-  onClick: () => void 
-}) => (
-  <button
-    onClick={onClick}
-    className={cn(
-      "sidebar-item w-full group",
-      active && "sidebar-item-active"
-    )}
-  >
-    <Icon className={cn(
-      "w-5 h-5 transition-colors",
-      active ? "text-agency-accent" : "text-agency-muted group-hover:text-white"
-    )} />
-    <span className="font-medium text-sm">{label}</span>
-  </button>
-);
+  path: string
+}) => {
+  const navigate = useNavigate();
+  return (
+    <button
+      onClick={() => navigate(path)}
+      className={cn(
+        "sidebar-item w-full group text-left",
+        active && "sidebar-item-active"
+      )}
+    >
+      <Icon className={cn(
+        "w-5 h-5 transition-colors",
+        active ? "text-agency-accent" : "text-agency-muted group-hover:text-white"
+      )} />
+      <span className="font-medium text-sm">{label}</span>
+    </button>
+  );
+};
 
 const StatCard = ({ 
   label, 
   value, 
   increase, 
   icon: Icon, 
-  trend 
+  trend,
+  onClick
 }: { 
   label: string, 
   value: string, 
   increase: string, 
   icon: any, 
-  trend: 'up' | 'down' 
+  trend: 'up' | 'down',
+  onClick?: () => void
 }) => (
-  <div className="stat-card">
+  <div 
+    className={cn(
+      "stat-card transition-all active:scale-95 cursor-pointer hover:border-agency-accent/50",
+      onClick && "hover:shadow-lg hover:shadow-agency-accent/10"
+    )}
+    onClick={onClick}
+  >
     <div className="flex justify-between items-start mb-2">
       <div className="p-2 rounded-lg bg-agency-bg">
         <Icon className="w-5 h-5 text-agency-accent" />
@@ -316,15 +327,71 @@ const Toast = ({ message, type, onClose }: { message: string, type: string, onCl
 
 import { LiveDispatchStream } from './components/LiveDispatchStream';
 
-const Overview = ({ onAction }: { onAction: (name: string, type?: string) => void }) => (
+const Overview = ({ onAction }: { onAction: (name: string, type?: string) => void }) => {
+  const navigate = useNavigate();
+
+  return (
   <div className="space-y-8 animate-in fade-in duration-700">
     <VibeCodingBar onAction={onAction} />
     
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      <StatCard label="Agency Revenue (Net)" value="$294.5k" increase="12.4%" trend="up" icon={DollarSign} />
-      <StatCard label="Clients Managed" value="42" increase="+3" trend="up" icon={Users} />
-      <StatCard label="P&L Margin" value="68.2%" increase="4.2%" trend="up" icon={Activity} />
-      <StatCard label="AOS Uptime" value="100%" increase="99.9%" trend="up" icon={ShieldCheck} />
+      <StatCard 
+        label="Agency Revenue (Net)" 
+        value="$294.5k" 
+        increase="12.4%" 
+        trend="up" 
+        icon={DollarSign} 
+        onClick={() => onAction('Visualizing revenue shards...', 'info')}
+      />
+      <StatCard 
+        label="Active Leads" 
+        value="1,284" 
+        increase="+12%" 
+        trend="up" 
+        icon={Users} 
+        onClick={() => navigate('/intake')}
+      />
+      <StatCard 
+        label="Ad Spend ROAS" 
+        value="4.8x" 
+        increase="0.4x" 
+        trend="up" 
+        icon={TrendingUp} 
+        onClick={() => navigate('/ppc')}
+      />
+      <StatCard 
+        label="Sync Accuracy" 
+        value="99.8%" 
+        increase="0.1%" 
+        trend="up" 
+        icon={Activity} 
+        onClick={() => navigate('/protocol')}
+      />
+    </div>
+
+    <div className="bg-gradient-to-r from-agency-accent/5 to-purple-500/5 p-8 rounded-[3rem] border border-agency-accent/10 flex flex-col md:flex-row items-center justify-between gap-8">
+      <div className="space-y-2 max-w-xl">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="px-3 py-1 bg-agency-accent text-white rounded-full text-[8px] font-black uppercase tracking-widest leading-none">AI ORCHESTRATOR</div>
+          <div className="px-3 py-1 border border-agency-accent text-agency-accent rounded-full text-[8px] font-black uppercase tracking-widest leading-none">L3 AUTONOMOUS</div>
+        </div>
+        <h2 className="text-3xl font-black font-display uppercase tracking-tight text-agency-ink">Marketing Engine Control Center</h2>
+        <p className="text-sm text-agency-muted font-medium">Activate the distributed marketing mesh to synchronize CRM leads, automate prospecting, and optimize ad spend across all connected nodes.</p>
+      </div>
+      <div className="flex gap-4">
+        <button 
+          onClick={() => navigate('/query-agent')}
+          className="px-8 py-4 bg-agency-ink text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-agency-ink/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2"
+        >
+          <Terminal className="w-4 h-4" /> Ask Intelligence
+        </button>
+        <button 
+          onClick={() => onAction('Triggering Global Marketing Sync...', 'info')}
+          className="px-8 py-4 bg-agency-accent text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-agency-accent/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2"
+        >
+          <Zap className="w-4 h-4" /> Activate Sync
+        </button>
+      </div>
     </div>
 
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -561,6 +628,7 @@ const Overview = ({ onAction }: { onAction: (name: string, type?: string) => voi
     </div>
   </div>
 );
+}
 
 const PricingView = ({ onAction }: { onAction: (name: string, type?: string) => void }) => {
   const [isCreatingSession, setIsCreatingSession] = useState<string | null>(null);
@@ -8119,6 +8187,69 @@ const MediaCenterView = ({
   const [isIdentityModalOpen, setIsIdentityModalOpen] = useState(false);
   const [isActivatingIdentity, setIsActivatingIdentity] = useState(false);
 
+  const [isGeneratingAd, setIsGeneratingAd] = useState(false);
+  const [adGenerationProgress, setAdGenerationProgress] = useState(0);
+
+  const handleGenerateAdvancedAd = async (prompt: string) => {
+    setIsGeneratingAd(true);
+    setAdGenerationProgress(0);
+    onAction(`SYSTEM: Initializing HDR Video Synthesis for: "${prompt}"`, 'info');
+
+    // Stage 1: Asset Rendering (1080p HDR)
+    for (let i = 0; i <= 40; i += 10) {
+      setAdGenerationProgress(i);
+      await new Promise(r => setTimeout(r, 600));
+    }
+    onAction('VISUAL ENGINE: 16:9 HDR frames synthesized. Compiling 15s sequence...', 'info');
+
+    // Stage 2: Voiceover Synthesis
+    for (let i = 41; i <= 70; i += 10) {
+      setAdGenerationProgress(i);
+      await new Promise(r => setTimeout(r, 800));
+    }
+    onAction('VOICEOVER: Custom AI voiceover synthesized. Frequency matching complete.', 'info');
+
+    // Stage 3: Strategy Alignment
+    for (let i = 71; i <= 100; i += 10) {
+      setAdGenerationProgress(i);
+      await new Promise(r => setTimeout(r, 500));
+    }
+
+    const newAd: MediaCenterAsset = {
+      id: `ad-${Date.now()}`,
+      name: 'Luxury_Urban_HDR_V1',
+      type: 'Video',
+      size: '24.8 MB',
+      updatedAt: new Date().toISOString(),
+      status: 'ready',
+      complianceScore: 99
+    };
+
+    setMediaCenterAssets(prev => [newAd, ...prev]);
+    onAction('AD SYNTHESIS COMPLETE: Video, Voiceover, and Strategy nodes are now active.', 'success');
+    setIsGeneratingAd(false);
+    
+    // Auto-open strategy modal with the new context
+    setCampaignStrategyInputs({
+      goals: 'High-Ticket Conversion',
+      targetAudience: 'Luxury Urban Consumers',
+      budget: '15000',
+      duration: '30'
+    });
+    setIsCampaignStrategyModalOpen(true);
+  };
+
+  const [isAnalyzingAssets, setIsAnalyzingAssets] = useState(false);
+  const [assetAnalysisReport, setAssetAnalysisReport] = useState<string | null>(null);
+  const [campaignStrategyInputs, setCampaignStrategyInputs] = useState({
+    goals: '',
+    targetAudience: '',
+    budget: '',
+    duration: '30'
+  });
+  const [isExecutingStrategy, setIsExecutingStrategy] = useState(false);
+  const [generatedDraftCampaign, setGeneratedDraftCampaign] = useState<any>(null);
+
   const [mediaCenterAssets, setMediaCenterAssets] = useState<MediaCenterAsset[]>([]);
   const [isMediaCenterLoading, setIsMediaCenterLoading] = useState(false);
   const [isComplianceScanning, setIsComplianceScanning] = useState<string | null>(null);
@@ -8679,33 +8810,69 @@ const MediaCenterView = ({
     }
   };
 
-  const handleStartCampaignGen = async () => {
-    if (isGenerating) return;
-    setIsGenerating(true);
-    onAction('Launching coordinated campaign generation engine...', 'info');
-    
-    const newId = `c-${Date.now()}`;
-    const newCampaign: ContentCampaign = {
-      id: newId,
-      name: `Growth_Blast_${new Date().toLocaleDateString()}`,
-      type: 'Multimodal',
-      status: 'generating',
-      aiScore: 88,
-      assets: 0
-    };
-    
-    setCampaigns(prev => [newCampaign, ...prev]);
-    
-    // Simulate generation stages
-    await new Promise(r => setTimeout(r, 2000));
-    setCampaigns(prev => prev.map(c => c.id === newId ? { ...c, assets: 8, aiScore: 92 } : c));
-    onAction('Drafting high-conversion multimodal variants using Gemini 1.5 Pro...', 'info');
-    
-    await new Promise(r => setTimeout(r, 3000));
-    setCampaigns(prev => prev.map(c => c.id === newId ? { ...c, status: 'ready', assets: 24, aiScore: 97 } : c));
-    onAction('Campaign generation sequence complete. All assets cached and ready for approval.', 'success');
-    
-    setIsGenerating(false);
+  const handleStartCampaignGen = () => {
+    setIsCampaignStrategyModalOpen(true);
+    analyzeExistingAssets();
+  };
+
+  const analyzeExistingAssets = async () => {
+    setIsAnalyzingAssets(true);
+    // Simulate multimodal analysis of current asset library
+    await new Promise(r => setTimeout(r, 1500));
+    setAssetAnalysisReport("Our current library contains a strong focus on technical expertise visuals (92% alignment) but lacks sufficient 'friendly' audio samples. Recommend a content split favoring 70% technical educational content and 30% testimonial-based social proof to balance the brand voice.");
+    setIsAnalyzingAssets(false);
+  };
+
+  const executeAdvancedCampaignGen = async () => {
+    if (!campaignStrategyInputs.goals || !campaignStrategyInputs.targetAudience) {
+      onAction('Strategy parameters incomplete. AI requires more context.', 'warning');
+      return;
+    }
+
+    setIsExecutingStrategy(true);
+    onAction('Synthesizing content strategy based on library analysis...', 'info');
+
+    try {
+      // Simulate specialized campaign generation API
+      await new Promise(r => setTimeout(r, 3000));
+      
+      const newId = `c-strat-${Date.now()}`;
+      const newCampaign: ContentCampaign = {
+        id: newId,
+        name: `Strategy_${campaignStrategyInputs.goals.substring(0, 10)}_${Date.now()}`,
+        type: 'AI-Orchestrated',
+        status: 'ready',
+        aiScore: 98,
+        assets: 12
+      };
+
+      setCampaigns(prev => [newCampaign, ...prev]);
+      
+      const draft = {
+        name: newCampaign.name,
+        summary: `Targeting ${campaignStrategyInputs.targetAudience} with a focus on ${campaignStrategyInputs.goals}.`,
+        suggestedChannels: ['LinkedIn', 'Google Search', 'Meta Retargeting'],
+        budgetAllocation: {
+          creative_synth: '20%',
+          ad_placement: '60%',
+          ai_optimization: '20%'
+        },
+        estimatedROI: '4.5x - 6.2x'
+      };
+
+      setGeneratedDraftCampaign(draft);
+      onAction('Content strategy and draft campaign nodes successfully synthesized.', 'success');
+    } catch (err) {
+      onAction('Strategy generation fault.', 'error');
+    } finally {
+      setIsExecutingStrategy(false);
+    }
+  };
+
+  const handleCloseStrategyModal = () => {
+    setIsCampaignStrategyModalOpen(false);
+    setGeneratedDraftCampaign(null);
+    setCampaignStrategyInputs({ goals: '', targetAudience: '', budget: '', duration: '30' });
   };
 
   return (
@@ -8716,6 +8883,21 @@ const MediaCenterView = ({
           <p className="text-xs text-agency-muted font-bold uppercase tracking-widest mt-1">Autonomous Multimodal Generation (Veo 3.1 & Gemini 1.5 Pro)</p>
         </div>
         <div className="flex gap-2">
+          <button 
+            onClick={() => handleGenerateAdvancedAd('Luxury urban lifestyle aesthetic, warm lighting, product hero shot, cinematic depth of field')}
+            disabled={isGeneratingAd}
+            className={cn(
+              "px-4 py-2 bg-agency-ink text-white rounded-xl text-xs font-bold uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-agency-ink/20 transition-all",
+              isGeneratingAd && "opacity-50 cursor-not-allowed"
+            )}
+          >
+            {isGeneratingAd ? (
+              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Video className="w-3.5 h-3.5" />
+            )}
+            {isGeneratingAd ? `Synthesizing ${adGenerationProgress}%` : "Generate AI Ad"}
+          </button>
           <button 
             onClick={handleIngest}
             disabled={isIngesting}
@@ -10516,6 +10698,185 @@ const MediaCenterView = ({
           </div>
         )}
       </AnimatePresence>
+
+      {/* Campaign Strategy Generator Modal */}
+      <AnimatePresence>
+        {isCampaignStrategyModalOpen && (
+          <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => !isExecutingStrategy && handleCloseStrategyModal()}
+              className="absolute inset-0 bg-agency-ink/60 backdrop-blur-md"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden border border-agency-border flex flex-col"
+            >
+              <div className="p-6 border-b border-agency-border flex justify-between items-center bg-agency-bg/50">
+                <div>
+                  <h3 className="text-xl font-bold font-display uppercase tracking-tight text-agency-ink">Strategy Generator</h3>
+                  <p className="text-[10px] text-agency-muted font-bold uppercase tracking-widest mt-1">Autonomous Content Strategy & Campaign Blueprinting</p>
+                </div>
+                <button 
+                  onClick={handleCloseStrategyModal}
+                  disabled={isExecutingStrategy}
+                  className="p-2 hover:bg-white rounded-full text-agency-muted transition-colors border border-transparent hover:border-agency-border"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-8 space-y-6 max-h-[70vh] overflow-y-auto">
+                <div className="p-4 bg-agency-accent/5 border border-agency-accent/20 rounded-2xl flex gap-4">
+                  <div className="p-2 bg-agency-accent text-white rounded-lg h-fit">
+                    <Cpu className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-[10px] font-black uppercase text-agency-accent tracking-widest mb-1">Asset Library Analysis</h4>
+                    {isAnalyzingAssets ? (
+                      <div className="flex items-center gap-2">
+                        <RefreshCw className="w-3 h-3 animate-spin text-agency-accent" />
+                        <span className="text-[11px] font-bold text-agency-muted italic">Interrogating multimodal shards...</span>
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-agency-ink font-medium leading-relaxed italic">"{assetAnalysisReport}"</p>
+                    )}
+                  </div>
+                </div>
+
+                {!generatedDraftCampaign ? (
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-agency-muted">Primary Goal</label>
+                        <input 
+                          type="text" 
+                          value={campaignStrategyInputs.goals}
+                          onChange={e => setCampaignStrategyInputs({...campaignStrategyInputs, goals: e.target.value})}
+                          placeholder="e.g. Lead Gen, Brand Awareness"
+                          className="w-full p-4 bg-agency-bg border border-agency-border rounded-xl text-sm font-bold focus:ring-2 focus:ring-agency-accent/20 outline-none transition-all"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-agency-muted">Target Audience</label>
+                        <input 
+                          type="text" 
+                          value={campaignStrategyInputs.targetAudience}
+                          onChange={e => setCampaignStrategyInputs({...campaignStrategyInputs, targetAudience: e.target.value})}
+                          placeholder="e.g. SaaS Founders, CMOs"
+                          className="w-full p-4 bg-agency-bg border border-agency-border rounded-xl text-sm font-bold focus:ring-2 focus:ring-agency-accent/20 outline-none transition-all"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-agency-muted">Budget Pool ($)</label>
+                        <input 
+                          type="number" 
+                          value={campaignStrategyInputs.budget}
+                          onChange={e => setCampaignStrategyInputs({...campaignStrategyInputs, budget: e.target.value})}
+                          placeholder="5000"
+                          className="w-full p-4 bg-agency-bg border border-agency-border rounded-xl text-sm font-bold focus:ring-2 focus:ring-agency-accent/20 outline-none transition-all"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-agency-muted">Duration (Days)</label>
+                        <select 
+                          value={campaignStrategyInputs.duration}
+                          onChange={e => setCampaignStrategyInputs({...campaignStrategyInputs, duration: e.target.value})}
+                          className="w-full p-4 bg-agency-bg border border-agency-border rounded-xl text-sm font-bold focus:ring-2 focus:ring-agency-accent/20 outline-none transition-all"
+                        >
+                          <option value="15">15 Days</option>
+                          <option value="30">30 Days</option>
+                          <option value="60">60 Days</option>
+                          <option value="90">90 Days</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <button 
+                      onClick={executeAdvancedCampaignGen}
+                      disabled={isExecutingStrategy}
+                      className="w-full py-5 bg-agency-accent text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl shadow-agency-accent/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3"
+                    >
+                      {isExecutingStrategy ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                      {isExecutingStrategy ? "Synthesizing Strategy..." : "Generate AI Strategy Shard"}
+                    </button>
+                  </div>
+                 ) : (
+                  <motion.div 
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className="space-y-6"
+                  >
+                    <div className="p-6 bg-emerald-50 border border-emerald-100 rounded-3xl space-y-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-emerald-500 text-white rounded-lg">
+                          <CheckCircle2 className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-bold text-emerald-900 uppercase tracking-tight">Draft Strategy Synthesized</h4>
+                          <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-widest">Protocol Version v4.2.1-Beta</p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center py-2 border-b border-emerald-100">
+                          <span className="text-[10px] font-black text-emerald-700 uppercase">Estimated ROI</span>
+                          <span className="text-sm font-black text-emerald-900">{generatedDraftCampaign.estimatedROI}</span>
+                        </div>
+                        <div className="space-y-2">
+                          <span className="text-[10px] font-black text-emerald-700 uppercase">Budget Allocation</span>
+                          <div className="grid grid-cols-3 gap-2">
+                            {Object.entries(generatedDraftCampaign.budgetAllocation).map(([k, v]: [string, any]) => (
+                               <div key={k} className="p-2 bg-white rounded-lg border border-emerald-100 text-center">
+                                  <div className="text-[10px] font-black text-emerald-900">{v}</div>
+                                  <div className="text-[7px] font-bold text-emerald-500 uppercase">{k.replace('_', ' ')}</div>
+                               </div>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="space-y-1 text-[11px] font-medium text-emerald-800 leading-relaxed italic border-t border-emerald-100 pt-3">
+                          "{generatedDraftCampaign.summary}"
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-4">
+                      <button 
+                        onClick={() => {
+                          onAction('Deploying draft campaign to content shards...', 'info');
+                          handleCloseStrategyModal();
+                        }}
+                        className="flex-1 py-4 bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                      >
+                         Approve & Initalize Shard
+                      </button>
+                      <button 
+                        onClick={() => setGeneratedDraftCampaign(null)}
+                        className="px-8 py-4 bg-white border border-agency-border rounded-xl text-[10px] font-black uppercase text-agency-muted hover:bg-agency-bg transition-all"
+                      >
+                        Adjust Strategy
+                      </button>
+                    </div>
+                  </motion.div>
+                 )}
+              </div>
+
+              <div className="p-6 border-t border-agency-border bg-agency-bg/50 flex justify-between items-center">
+                <div className="text-[9px] font-bold text-agency-muted uppercase tracking-widest flex items-center gap-2">
+                   <ShieldCheckIcon className="w-3 h-3 text-agency-accent" /> High-Tier Autonomous Orchestration
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
@@ -11411,8 +11772,8 @@ export default function App() {
     }
   };
 
-  const handleGlobalAction = (action: string, category: string) => {
-    addNotification(`Global Action Initiated: ${action}`, 'success');
+  const handleGlobalAction = async (action: string, category: string) => {
+    onAction(`Global Action Initiated: ${action}`, 'success');
     setIsActionModalOpen(false);
     
     // Inject agentic telemetry
@@ -11425,6 +11786,20 @@ export default function App() {
       payload: { action, category, status: 'dispatched' }
     };
     setLogs(prev => [newLog, ...prev.slice(0, 49)]);
+
+    // Special logic for "fruifful" results
+    if (action === 'Budget Shift') {
+      onAction('AI AGENT: Reallocating $15,000 from Meta to TikTok based on ROAS (5.2x vs 3.8x).', 'info');
+      setTimeout(() => onAction('REALLOCATION COMPLETE: Ad performance stabilized.', 'success'), 2000);
+    } else if (action === 'Batch Creatives') {
+      onAction('CREATIVE ENGINE: Synthesizing 20 variants using Vibe Library specs...', 'info');
+      setTimeout(() => onAction('SYNTHESIS COMPLETE: 20 assets pushed to Approval Shard.', 'success'), 2500);
+    } else if (action === 'Headless Crawl') {
+      onAction('SEO AGENT: Scanning 5,000 URLs for technical debt...', 'info');
+      setTimeout(() => onAction('CRAWL COMPLETE: 42 Critical LCP issues identified.', 'warning'), 3000);
+    } else if (action === 'Launch New Spec') {
+      onAction('SYSTEM: Initializing new campaign shard with blueprint L2-A.', 'info');
+    }
   };
 
 
@@ -11552,36 +11927,36 @@ export default function App() {
         </div>
 
         <nav className="flex-1 px-4 mt-6 space-y-1">
-          <SidebarItem icon={LayoutDashboard} label="AOS Overview" active={activeTab === 'overview'} onClick={() => setActiveTab('overview')} />
+          <SidebarItem icon={LayoutDashboard} label="AOS Overview" active={activeTab === 'overview'} path="/overview" />
           <div className="pt-4 pb-2 px-4 text-[10px] font-bold uppercase tracking-widest text-white/40">Core Pillars</div>
-          <SidebarItem icon={Mail} label="Online Ops" active={activeTab === 'online'} onClick={() => setActiveTab('online')} />
+          <SidebarItem icon={Mail} label="Online Ops" active={activeTab === 'online'} path="/online" />
           <div className="relative group">
-            <SidebarItem icon={Megaphone} label="Social Media" active={activeTab === 'social'} onClick={() => setActiveTab('social')} />
+            <SidebarItem icon={Megaphone} label="Social Media" active={activeTab === 'social'} path="/social" />
             {isSidebarOpen && (
               <span className="absolute right-4 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-agency-accent animate-pulse" />
             )}
           </div>
-          <SidebarItem icon={TrendingUp} label="SEO Engine" active={activeTab === 'seo'} onClick={() => setActiveTab('seo')} />
-          <SidebarItem icon={Target} label="Paid Search" active={activeTab === 'ppc'} onClick={() => setActiveTab('ppc')} />
+          <SidebarItem icon={TrendingUp} label="SEO Engine" active={activeTab === 'seo'} path="/seo" />
+          <SidebarItem icon={Target} label="Paid Search" active={activeTab === 'ppc'} path="/ppc" />
           
           <div className="pt-4 pb-2 px-4 text-[10px] font-bold uppercase tracking-widest text-white/40">Assets & Core</div>
-          <SidebarItem icon={FileJson} label="Media Center" active={activeTab === 'media'} onClick={() => setActiveTab('media')} />
-          <SidebarItem icon={Zap} label="Vibe Library" active={activeTab === 'vibe-library'} onClick={() => setActiveTab('vibe-library')} />
-          <SidebarItem icon={UserCircle} label="System Personas" active={activeTab === 'personas'} onClick={() => setActiveTab('personas')} />
-          <SidebarItem icon={Users2} label="Collaboration" active={activeTab === 'collaboration'} onClick={() => setActiveTab('collaboration')} />
+          <SidebarItem icon={FileJson} label="Media Center" active={activeTab === 'media'} path="/media" />
+          <SidebarItem icon={Zap} label="Vibe Library" active={activeTab === 'vibe-library'} path="/vibe-library" />
+          <SidebarItem icon={UserCircle} label="System Personas" active={activeTab === 'personas'} path="/personas" />
+          <SidebarItem icon={Users2} label="Collaboration" active={activeTab === 'collaboration'} path="/collaboration" />
           
           {currentUser.role === 'Admin' && (
             <>
               <div className="pt-4 pb-2 px-4 text-[10px] font-bold uppercase tracking-widest text-white/40">Tenant Ops</div>
-              <SidebarItem icon={CreditCard} label="User Subscription" active={activeTab === 'subscription'} onClick={() => setActiveTab('subscription')} />
-              <SidebarItem icon={Mail} label="Secured Dispatch" active={activeTab === 'email-dispatch'} onClick={() => setActiveTab('email-dispatch')} />
-              <SidebarItem icon={UserCheck} label="Email Approvals" active={activeTab === 'email-approvals'} onClick={() => setActiveTab('email-approvals')} />
-              <SidebarItem icon={BarChart3} label="Email Tracking" active={activeTab === 'email-tracking'} onClick={() => setActiveTab('email-tracking')} />
-              <SidebarItem icon={ClipboardList} label="Security Audit" active={activeTab === 'email-audit'} onClick={() => setActiveTab('email-audit')} />
-              <SidebarItem icon={PlusSquare} label="Lead Intake" active={activeTab === 'intake'} onClick={() => setActiveTab('intake')} />
-          <SidebarItem icon={PlusSquare} label="Agency Intelligence" active={activeTab === 'query-agent'} onClick={() => setActiveTab('query-agent')} />
-              <SidebarItem icon={CreditCard} label="Billing & Tiers" active={activeTab === 'pricing'} onClick={() => setActiveTab('pricing')} />
-              <SidebarItem icon={Settings} label="System Settings" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
+              <SidebarItem icon={CreditCard} label="User Subscription" active={activeTab === 'subscription'} path="/subscription" />
+              <SidebarItem icon={Mail} label="Secured Dispatch" active={activeTab === 'email-dispatch'} path="/email-dispatch" />
+              <SidebarItem icon={UserCheck} label="Email Approvals" active={activeTab === 'email-approvals'} path="/approvals" />
+              <SidebarItem icon={BarChart3} label="Email Tracking" active={activeTab === 'email-tracking'} path="/email-tracking" />
+              <SidebarItem icon={ClipboardList} label="Security Audit" active={activeTab === 'email-audit'} path="/email-audit" />
+              <SidebarItem icon={PlusSquare} label="Lead Intake" active={activeTab === 'intake'} path="/intake" />
+          <SidebarItem icon={PlusSquare} label="Agency Intelligence" active={activeTab === 'query-agent'} path="/query-agent" />
+              <SidebarItem icon={CreditCard} label="Billing & Tiers" active={activeTab === 'pricing'} path="/pricing" />
+              <SidebarItem icon={Settings} label="System Settings" active={activeTab === 'settings'} path="/settings" />
             </>
           )}
         </nav>
