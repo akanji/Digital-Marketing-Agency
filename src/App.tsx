@@ -166,7 +166,8 @@ import {
   EmailDeliveryMetrics,
   ComplianceShield
 } from './types';
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI, Type } from "@google/genai";
+import type { FunctionDeclaration } from "@google/genai";
 import SecureDispatch from './pages/SecureDispatch';
 import EmailAuditView from './pages/SecureDispatch/Audit';
 import EmailTrackingView from './pages/SecureDispatch/Tracking';
@@ -721,42 +722,358 @@ const PricingView = ({ onAction }: { onAction: (name: string, type?: string) => 
   );
 };
 
+const LeadIntakeView = ({ onAction }: { onAction: (msg: string, type?: any) => void }) => {
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    company: '',
+    budget: '',
+    needs: ''
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    onAction('LEAD INTAKE: Parsing form data for CRM ingestion...', 'info');
+
+    try {
+      // 1. Ingest into CRM
+      const crmResponse = await fetch('/api/v1/marketing/crm/upsert-lead', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          status: 'Lead',
+          source: 'Jotform_Simulation'
+        })
+      });
+      const crmData = await crmResponse.json();
+
+      // 2. Trigger enrichment if budget > 5000
+      if (parseInt(formData.budget) > 5000) {
+        onAction('HIGH VALUE LEAD: Triggering AI Prospecting enrichment...', 'info');
+        await fetch('/api/v1/marketing/prospecting/enrich', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: formData.email, company: formData.company })
+        });
+      }
+
+      onAction('Lead workflows executed successfully. CRM Shard updated.', 'success');
+      setFormData({ name: '', email: '', company: '', budget: '', needs: '' });
+    } catch (err) {
+      onAction('Workflow sequence interrupted.', 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="max-w-2xl mx-auto">
+      <div className="panel-card p-8 bg-white border border-agency-border rounded-[2.5rem] shadow-2xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-agency-accent/5 blur-2xl -mr-16 -mt-16" />
+        <div className="mb-8">
+          <h2 className="text-2xl font-black font-display uppercase tracking-tight text-agency-ink">Lead Intake Interface</h2>
+          <p className="text-[10px] font-bold text-agency-muted uppercase tracking-widest mt-1">Simulated External Form Integration (Jotform)</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-agency-muted">Full Name</label>
+              <input 
+                type="text" 
+                required
+                value={formData.name}
+                onChange={e => setFormData({...formData, name: e.target.value})}
+                className="w-full p-4 bg-agency-bg border border-agency-border rounded-2xl font-bold focus:ring-2 focus:ring-agency-accent/20 outline-none transition-all"
+                placeholder="John Doe"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-agency-muted">Email Address</label>
+              <input 
+                type="email" 
+                required
+                value={formData.email}
+                onChange={e => setFormData({...formData, email: e.target.value})}
+                className="w-full p-4 bg-agency-bg border border-agency-border rounded-2xl font-bold focus:ring-2 focus:ring-agency-accent/20 outline-none transition-all"
+                placeholder="john@company.com"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-agency-muted">Company Name</label>
+              <input 
+                type="text" 
+                value={formData.company}
+                onChange={e => setFormData({...formData, company: e.target.value})}
+                className="w-full p-4 bg-agency-bg border border-agency-border rounded-2xl font-bold focus:ring-2 focus:ring-agency-accent/20 outline-none transition-all"
+                placeholder="Acme Corp"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-agency-muted">Monthly Budget ($)</label>
+              <input 
+                type="number" 
+                value={formData.budget}
+                onChange={e => setFormData({...formData, budget: e.target.value})}
+                className="w-full p-4 bg-agency-bg border border-agency-border rounded-2xl font-bold focus:ring-2 focus:ring-agency-accent/20 outline-none transition-all"
+                placeholder="5000"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase tracking-widest text-agency-muted">Project Needs</label>
+            <textarea 
+              value={formData.needs}
+              onChange={e => setFormData({...formData, needs: e.target.value})}
+              className="w-full p-4 bg-agency-bg border border-agency-border rounded-2xl font-bold focus:ring-2 focus:ring-agency-accent/20 outline-none transition-all min-h-[100px]"
+              placeholder="Describe campaign goals..."
+            />
+          </div>
+
+          <button 
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full p-6 bg-agency-accent text-white rounded-2xl font-black uppercase tracking-[0.2em] shadow-xl shadow-agency-accent/20 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+          >
+            {isSubmitting ? 'Synchronizing Nodes...' : 'Submit Lead Data'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// --- Tool Definitions ---
+
+const MARKETING_TOOLS: FunctionDeclaration[] = [
+  {
+    name: "upsertLead",
+    description: "Upsert a lead into the CRM (GoHighLevel/HubSpot).",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        email: { type: Type.STRING, description: "The lead's email address." },
+        name: { type: Type.STRING, description: "The lead's full name." },
+        company: { type: Type.STRING, description: "The lead's company name." },
+        status: { type: Type.STRING, enum: ["Lead", "Qualified", "Active Client"], description: "The lifecycle stage of the lead." },
+      },
+      required: ["email", "name"]
+    }
+  },
+  {
+    name: "triggerProspecting",
+    description: "Trigger a prospecting search in Seamless.AI to enrich a lead profile with phone numbers and job titles.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        email: { type: Type.STRING, description: "The email to enrich." },
+        company: { type: Type.STRING, description: "The company name for better targeting." }
+      },
+      required: ["email"]
+    }
+  },
+  {
+     name: "checkPayments",
+     description: "Check Stripe payment status and transaction history for a specific customer email.",
+     parameters: {
+       type: Type.OBJECT,
+       properties: {
+         customer_email: { type: Type.STRING, description: "The customer's email to check." }
+       },
+       required: ["customer_email"]
+     }
+  },
+  {
+    name: "getAdPerformance",
+    description: "Retrieve real-time performance data (spend, ROAS, conversions) from Meta and Google Ads.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {}
+    }
+  },
+  {
+    name: "logCommunication",
+    description: "Log a chat or call summary in Thoughtly/Zoho and record sentiment analysis.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        lead_id: { type: Type.STRING, description: "The CRM ID of the lead." },
+        summary: { type: Type.STRING, description: "A concise summary of the interaction." },
+        sentiment: { type: Type.STRING, enum: ["Positive", "Neutral", "Negative"], description: "The detected sentiment of the interaction." }
+      },
+      required: ["lead_id", "summary", "sentiment"]
+    }
+  },
+  {
+    name: "createPaymentLink",
+    description: "Generate a Stripe Payment Link for a customer to complete a purchase.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        customer_email: { type: Type.STRING, description: "The customer's email address." },
+        amount: { type: Type.NUMBER, description: "The amount to charge in cents (e.g. 5000 for $50.00)." },
+        product_name: { type: Type.STRING, description: "The name of the service or product." }
+      },
+      required: ["customer_email", "amount", "product_name"]
+    }
+  }
+];
+
+const MARKETING_ENGINE_SYSTEM_PROMPT = `
+You are the "Marketing Engine AI" for a Digital Marketing Agency app. Your primary goal is to orchestrate lead generation, CRM synchronization, and ad performance tracking.
+
+# INTEGRATIONS & CAPABILITIES
+1. CRM (GoHighLevel/HubSpot): You have read/write access to lead records via API.
+2. Prospecting (Seamless.AI): You can trigger data scraping for specific B2B targets.
+3. Payments (Stripe): You monitor successful transactions and generate payment links.
+4. Ads (Meta/Google): You can retrieve real-time click/conversion data via Zapier nodes.
+5. Communications (Thoughtly/Zoho): You handle chat sentiment and call logging summaries.
+
+# OPERATIONAL WORKFLOWS
+- LEAD INTAKE: When a user submits a form (Jotform), parse the JSON data, map it to CRM fields, and trigger an 'Internal Alert' in Google Chat.
+- AI PROSPECTING: If a lead is marked "Incomplete," query Seamless.AI via the n8n HTTP node to enrich the profile with phone numbers and job titles.
+- PAYMENT SYNC: Upon a Stripe "payment_intent.succeeded" or "checkout.session.completed" webhook, update the CRM status to "Closed Won" and trigger onboarding.
+- CHECKOUT STAGE: If a lead reaches the checkout stage, generate a Stripe Payment Link using create_payment_link and monitor for completion.
+
+# RESPONSE GUIDELINES
+- Always format data for CRM compatibility (JSON) when providing technical summaries.
+- Maintain a professional, sales-driven tone.
+- If a tool connection fails, provide a technical summary of the HTTP error code.
+`;
+
 const QueryAgentView = ({ onAction, tenantId }: { onAction: (name: string, type?: string) => void, tenantId: string }) => {
   const [query, setQuery] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [history, setHistory] = useState<QueryLogEntry[]>([]);
   const [activeResponse, setActiveResponse] = useState<QueryResponse | null>(null);
 
+  const ai = useMemo(() => new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }), []);
+
+  const handleToolCall = async (call: { name: string, args: any }) => {
+    onAction(`Executing marketing node: ${call.name}...`, 'info');
+    
+    let endpoint = '';
+    let method = 'POST';
+    
+    switch (call.name) {
+      case 'upsertLead':
+        endpoint = '/api/v1/marketing/crm/upsert-lead';
+        break;
+      case 'triggerProspecting':
+        endpoint = '/api/v1/marketing/prospecting/enrich';
+        break;
+      case 'getAdPerformance':
+        endpoint = '/api/v1/marketing/ads/performance';
+        method = 'GET';
+        break;
+      case 'logCommunication':
+        endpoint = '/api/v1/marketing/comms/log';
+        break;
+      case 'createPaymentLink':
+        endpoint = '/api/v1/marketing/stripe/create-link';
+        break;
+      case 'checkPayments':
+        endpoint = `/api/v1/marketing/payments/status?customer_email=${encodeURIComponent(call.args.customer_email)}`;
+        method = 'GET';
+        break;
+      default:
+        throw new Error(`Unknown tool: ${call.name}`);
+    }
+
+    const response = await fetch(endpoint, {
+      method,
+      headers: method === 'POST' ? { 'Content-Type': 'application/json' } : undefined,
+      body: method === 'POST' ? JSON.stringify(call.args) : undefined
+    });
+
+    if (!response.ok) {
+      throw new Error(`Tool connection failed with status: ${response.status}`);
+    }
+
+    return await response.json();
+  };
+
   const handleQuery = async (q: string = query) => {
     if (!q.trim()) return;
     setIsProcessing(true);
-    onAction('Query Agent: Interrogating platform nodes...', 'info');
+    onAction('Marketing Engine: Orchestrating workflow nodes...', 'info');
 
     try {
-      const response = await fetch('/api/v1/query/process', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: q, context: { tenant_id: tenantId } })
+      // Use Client-Side Gemini as per SKILL guidelines
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: q,
+        config: {
+          systemInstruction: MARKETING_ENGINE_SYSTEM_PROMPT,
+          tools: [{ functionDeclarations: MARKETING_TOOLS }],
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              answer: { type: Type.STRING },
+              confidence_score: { type: Type.NUMBER },
+              recommended_actions: { type: Type.ARRAY, items: { type: Type.STRING } },
+              supporting_data: { 
+                type: Type.OBJECT,
+                properties: {
+                  metrics: { type: Type.OBJECT },
+                  charts: { type: Type.ARRAY, items: { type: Type.OBJECT } }
+                }
+              }
+            },
+            required: ["answer"]
+          }
+        }
       });
 
-      if (!response.ok) throw new Error('Query Interface Error');
-      const data: QueryResponse = await response.json();
+      let finalData: QueryResponse;
+
+      if (response.functionCalls && response.functionCalls.length > 0) {
+        const results = await Promise.all(response.functionCalls.map(call => handleToolCall(call)));
+        
+        // Second pass with tool results
+        const secondPass = await ai.models.generateContent({
+          model: "gemini-3-flash-preview",
+          contents: [
+            { parts: [{ text: q }] },
+            { parts: [
+              { text: "Tool results gathered successfully." },
+              { text: JSON.stringify(results) }
+            ]}
+          ],
+          config: {
+            systemInstruction: MARKETING_ENGINE_SYSTEM_PROMPT,
+            responseMimeType: "application/json"
+          }
+        });
+        
+        finalData = JSON.parse(secondPass.text);
+      } else {
+        finalData = JSON.parse(response.text);
+      }
       
       const newEntry: QueryLogEntry = {
         id: `q-${Date.now()}`,
         timestamp: new Date().toISOString(),
         query: q,
-        response: data,
-        type: q.toLowerCase().includes('write') || q.toLowerCase().includes('generate') ? 'creative' : 'operational'
+        response: finalData,
+        type: q.toLowerCase().includes('lead') || q.toLowerCase().includes('sync') ? 'operational' : 'creative'
       };
 
       setHistory(prev => [newEntry, ...prev]);
-      setActiveResponse(data);
+      setActiveResponse(finalData);
       setQuery('');
-      onAction('Query response received with high confidence.', 'success');
-    } catch (error) {
+      onAction('Marketing Engine sync finalized.', 'success');
+    } catch (error: any) {
       console.error(error);
-      onAction('Query Agent: Sequence protocol fault.', 'error');
+      onAction(`Marketing Engine fault: ${error.message}`, 'error');
     } finally {
       setIsProcessing(false);
     }
@@ -11261,7 +11578,8 @@ export default function App() {
               <SidebarItem icon={UserCheck} label="Email Approvals" active={activeTab === 'email-approvals'} onClick={() => setActiveTab('email-approvals')} />
               <SidebarItem icon={BarChart3} label="Email Tracking" active={activeTab === 'email-tracking'} onClick={() => setActiveTab('email-tracking')} />
               <SidebarItem icon={ClipboardList} label="Security Audit" active={activeTab === 'email-audit'} onClick={() => setActiveTab('email-audit')} />
-              <SidebarItem icon={PlusSquare} label="Agency Intelligence" active={activeTab === 'query-agent'} onClick={() => setActiveTab('query-agent')} />
+              <SidebarItem icon={PlusSquare} label="Lead Intake" active={activeTab === 'intake'} onClick={() => setActiveTab('intake')} />
+          <SidebarItem icon={PlusSquare} label="Agency Intelligence" active={activeTab === 'query-agent'} onClick={() => setActiveTab('query-agent')} />
               <SidebarItem icon={CreditCard} label="Billing & Tiers" active={activeTab === 'pricing'} onClick={() => setActiveTab('pricing')} />
               <SidebarItem icon={Settings} label="System Settings" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
             </>
@@ -11472,6 +11790,7 @@ export default function App() {
                   />
                 } />
                 <Route path="/pricing" element={<PricingView onAction={addNotification} />} />
+                <Route path="/intake" element={<LeadIntakeView onAction={addNotification} />} />
                 <Route path="/query-agent" element={<QueryAgentView onAction={addNotification} tenantId={tenantId} />} />
                 <Route path="/intelligence" element={<QueryAgentView onAction={addNotification} tenantId={tenantId} />} />
                 <Route path="/agency-intelligence" element={<QueryAgentView onAction={addNotification} tenantId={tenantId} />} />

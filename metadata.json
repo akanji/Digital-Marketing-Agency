@@ -1,6 +1,6 @@
 {
-  "name": "AOS: Digital You Demand",
-  "description": "Multi-tenant Agency Operating System (AOS) for white-label marketing automation, team orchestration, and client lifecycle management.",
+  "name": "Marketing Engine AI",
+  "description": "Lead Capture & Marketing Orchestrator for Digital Marketing Agencies, integrating CRM, prospecting, payments, and ad tracking with Gemini AI.",
   "requestFramePermissions": [
     "camera",
     "microphone",

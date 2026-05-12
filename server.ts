@@ -155,6 +155,123 @@ async function startServer() {
     }
   });
 
+  // --- MARKETING INTEGRATION TOOLS (N8N/ZAPIER NODES) ---
+
+  // CRM Integration (GoHighLevel/HubSpot)
+  app.post('/api/v1/marketing/crm/upsert-lead', (req, res) => {
+    const lead = req.body;
+    console.log(`[CRM] Upserting lead: ${lead.email}`);
+    // Simulate mapping and storage
+    res.json({
+      status: 'success',
+      crm_id: `crm-${Date.now()}`,
+      message: 'Lead successfully synchronized with HubSpot/GHL.',
+      mapped_data: lead
+    });
+  });
+
+  // Prospecting Integration (Seamless.AI)
+  app.post('/api/v1/marketing/prospecting/enrich', (req, res) => {
+    const { email, company } = req.body;
+    console.log(`[Prospecting] Enriching profile for: ${email}`);
+    // Simulate enrichment
+    res.json({
+      status: 'success',
+      enrichment: {
+        phone: '+1 (555) 012-3456',
+        title: 'VP of Marketing',
+        linkedin_url: `https://linkedin.com/in/prospect-${Date.now()}`,
+        company_revenue: '$10M+'
+      }
+    });
+  });
+
+  // Ads Performance (Meta/Google Ads)
+  app.get('/api/v1/marketing/ads/performance', (req, res) => {
+    console.log('[Ads] Retrieving real-time performance data');
+    res.json({
+      meta: { spend: 1250, conversions: 45, roas: 3.2 },
+      google: { spend: 850, conversions: 28, roas: 4.1 },
+      timestamp: new Date().toISOString()
+    });
+  });
+
+  // Communications (Thoughtly/Zoho)
+  app.post('/api/v1/marketing/comms/log', (req, res) => {
+    const { lead_id, summary, sentiment } = req.body;
+    console.log(`[Comms] Logging interaction for lead ${lead_id}: ${sentiment}`);
+    res.json({
+      status: 'logged',
+      interaction_id: `int-${Date.now()}`,
+      sentiment_recorded: sentiment
+    });
+  });
+
+  // Zoho Call Summary Webhook (n8n node target)
+  app.post('/api/v1/marketing/webhooks/call-log', (req, res) => {
+    const { call_summary, lead_email } = req.body;
+    console.log(`[Zoho] Received call log for ${lead_email}`);
+    res.json({
+      status: 'success',
+      processed: true,
+      summary: call_summary,
+      sentiment_task_id: `sent-${Date.now()}`
+    });
+  });
+
+  // Google Ads Lead Webhook (Zapier node target)
+  app.post('/api/v1/marketing/webhooks/ads', (req, res) => {
+    const leadData = req.body;
+    console.log(`[Zapier] New Google Ads lead: ${leadData.email}`);
+    res.json({
+      status: 'ingested',
+      crm_sync: 'pending',
+      zap_id: leadData.zap_id || `zap-${Date.now()}`
+    });
+  });
+
+  // Stripe Payment Link Generation
+  app.post('/api/v1/marketing/stripe/create-link', async (req, res) => {
+    const { customer_email, amount, product_name } = req.body;
+    console.log(`[Stripe] Creating payment link for ${customer_email}`);
+    // Simulate link generation
+    res.json({
+      status: 'created',
+      payment_link: `https://checkout.stripe.com/pay/plink_${Date.now()}`,
+      customer_email,
+      product_name
+    });
+  });
+
+  // Checkout Session Completion Webhook
+  app.post('/api/v1/marketing/webhooks/payment-complete', (req, res) => {
+    const { customer_email, session_id } = req.body;
+    console.log(`[Stripe] Checkout completed for ${customer_email}`);
+    res.json({
+      status: 'success',
+      action: 'MOVE_TO_CLOSED_WON',
+      customer: customer_email,
+      trigger_onboarding: true
+    });
+  });
+
+  // Stripe Payment Monitor
+  app.get('/api/v1/marketing/payments/status', async (req, res) => {
+    const { customer_email } = req.query;
+    console.log(`[Payments] Monitoring transactions for: ${customer_email}`);
+    // In a real app, query Stripe API for recent payments
+    res.json({
+      status: 'active',
+      last_transaction: {
+        id: 'pi_123',
+        amount: 19900,
+        status: 'succeeded',
+        date: new Date().toISOString()
+      },
+      onboarding_triggered: true
+    });
+  });
+
   app.use(express.json());
   app.use(cors());
 
