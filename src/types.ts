@@ -541,7 +541,7 @@ export interface PPCManagerResponse {
 }
 
 export type Pillar = 'online' | 'social' | 'seo' | 'ppc';
-export type Tab = 'overview' | 'online' | 'social' | 'seo' | 'ppc' | 'approvals' | 'clients' | 'protocol' | 'media' | 'personas' | 'collaboration' | 'settings' | 'vibe-library' | 'subscription' | 'pricing' | 'query-agent' | 'email-dispatch' | 'email-approvals' | 'email-tracking' | 'email-audit';
+export type Tab = 'overview' | 'online' | 'social' | 'seo' | 'ppc' | 'approvals' | 'clients' | 'protocol' | 'media' | 'personas' | 'collaboration' | 'settings' | 'vibe-library' | 'subscription' | 'pricing' | 'query-agent' | 'email-dispatch' | 'email-approvals' | 'email-tracking' | 'email-audit' | 'intake';
 
 export type EmailType = 'transactional' | 'marketing' | 'reporting' | 'financial' | 'legal';
 

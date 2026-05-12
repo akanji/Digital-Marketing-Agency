@@ -1104,7 +1104,7 @@ const QueryAgentView = ({ onAction, tenantId }: { onAction: (name: string, type?
       let finalData: QueryResponse;
 
       if (response.functionCalls && response.functionCalls.length > 0) {
-        const results = await Promise.all(response.functionCalls.map(call => handleToolCall(call)));
+        const results = await Promise.all(response.functionCalls.map(call => handleToolCall(call as { name: string, args: any })));
         
         // Second pass with tool results
         const secondPass = await ai.models.generateContent({
@@ -8187,6 +8187,7 @@ const MediaCenterView = ({
   const [isIdentityModalOpen, setIsIdentityModalOpen] = useState(false);
   const [isActivatingIdentity, setIsActivatingIdentity] = useState(false);
 
+  const [isCampaignStrategyModalOpen, setIsCampaignStrategyModalOpen] = useState(false);
   const [isGeneratingAd, setIsGeneratingAd] = useState(false);
   const [adGenerationProgress, setAdGenerationProgress] = useState(0);
 
@@ -8216,13 +8217,15 @@ const MediaCenterView = ({
     }
 
     const newAd: MediaCenterAsset = {
-      id: `ad-${Date.now()}`,
-      name: 'Luxury_Urban_HDR_V1',
-      type: 'Video',
-      size: '24.8 MB',
-      updatedAt: new Date().toISOString(),
+      asset_id: `ad-${Date.now()}`,
+      asset_name: 'Luxury_Urban_HDR_V1',
+      asset_type: 'video',
       status: 'ready',
-      complianceScore: 99
+      production_version: 'v1.0',
+      brand_alignment: { confidence: 0.99, detected_tone: 'Luxury', visual_match: 0.98 },
+      usage_rights: { campaigns: ['Luxury_Urban'], platforms_approved: ['HDR_MODES'] },
+      download_url: '#',
+      cdn_url: '#'
     };
 
     setMediaCenterAssets(prev => [newAd, ...prev]);
@@ -8252,10 +8255,57 @@ const MediaCenterView = ({
 
   const [mediaCenterAssets, setMediaCenterAssets] = useState<MediaCenterAsset[]>([]);
   const [isMediaCenterLoading, setIsMediaCenterLoading] = useState(false);
+  const [isGlobalComplianceScanning, setIsGlobalComplianceScanning] = useState(false);
+  const [globalComplianceReport, setGlobalComplianceReport] = useState<{ total: number; compliant: number; flagged: number; issues: string[] } | null>(null);
+  const [isFixingCompliance, setIsFixingCompliance] = useState(false);
   const [isComplianceScanning, setIsComplianceScanning] = useState<string | null>(null);
   const [complianceResults, setComplianceResults] = useState<Record<string, any>>({});
   const [isComplianceModalOpen, setIsComplianceModalOpen] = useState(false);
   const [selectedAssetForCompliance, setSelectedAssetForCompliance] = useState<MediaCenterAsset | null>(null);
+
+  const scanAllAssetsForCompliance = async () => {
+    setIsGlobalComplianceScanning(true);
+    onAction('SYSTEM: Initializing Luxury Urban Lifestyle aesthetic scan across global CDN...', 'info');
+    
+    // Simulate deep multimodal scanning of all assets
+    await new Promise(r => setTimeout(r, 4000));
+    
+    const total = mediaCenterAssets.length || 12;
+    const flagged = 3;
+    const compliant = total - flagged;
+    
+    setGlobalComplianceReport({
+      total,
+      compliant,
+      flagged,
+      issues: [
+        "Asset 'Neon_Street_Night' uses oversaturated purples (Palette Mismatch)",
+        "Asset 'Office_Interior_v2' has low cinematic depth (Aesthetic Deviation)",
+        "Asset 'Product_CloseUp_A' contains legacy logo version (Compliance Error)"
+      ]
+    });
+
+    onAction(`Compliance scan complete: ${flagged} assets flagged for 'Luxury Urban Lifestyle' deviations.`, 'warning');
+    setIsGlobalComplianceScanning(false);
+  };
+
+  const handleFixAllComplianceErrors = async () => {
+    setIsFixingCompliance(true);
+    onAction('NEURAL HARMONIZER: Recalibrating tagged assets to Luxury Urban aesthetic...', 'info');
+
+    // Simulate AI correction of assets
+    await new Promise(r => setTimeout(r, 3500));
+    
+    setGlobalComplianceReport(prev => prev ? {
+      ...prev,
+      compliant: prev.total,
+      flagged: 0,
+      issues: []
+    } : null);
+
+    onAction('Neural Harmonization complete. All assets now 100% compliant with brand guidelines.', 'success');
+    setIsFixingCompliance(false);
+  };
 
   const [isCinematicGenModalOpen, setIsCinematicGenModalOpen] = useState(false);
   const [isGeneratingCinematic, setIsGeneratingCinematic] = useState(false);
@@ -8840,7 +8890,7 @@ const MediaCenterView = ({
       const newCampaign: ContentCampaign = {
         id: newId,
         name: `Strategy_${campaignStrategyInputs.goals.substring(0, 10)}_${Date.now()}`,
-        type: 'AI-Orchestrated',
+        type: 'Video',
         status: 'ready',
         aiScore: 98,
         assets: 12
@@ -8931,13 +8981,104 @@ const MediaCenterView = ({
         </div>
       </div>
 
+      <div className="bg-agency-ink p-8 rounded-[3rem] border border-white/10 shadow-2xl overflow-hidden relative group">
+        <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
+          <ShieldCheck className="w-48 h-48 text-white" />
+        </div>
+        
+        <div className="relative z-10 grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="px-2 py-0.5 bg-agency-accent text-white rounded text-[8px] font-black uppercase tracking-widest">BRAND GUARDIAN</div>
+              <div className="px-2 py-0.5 border border-white/20 text-white/60 rounded text-[8px] font-black uppercase tracking-widest leading-none">AESTHETIC: LUXURY URBAN</div>
+            </div>
+            <h3 className="text-2xl font-black font-display uppercase tracking-tight text-white">Neural Compliance Dashboard</h3>
+            <p className="text-sm text-white/50 font-medium leading-relaxed">Continuous neural audit of global assets against Luxury Urban Lifestyle guidelines (Edition 2026-B). Monitoring palette saturation, cinematic depth, and vocal frequency alignment.</p>
+            <div className="flex gap-4">
+              <button 
+                onClick={scanAllAssetsForCompliance}
+                disabled={isGlobalComplianceScanning}
+                className="px-6 py-3 bg-white text-agency-ink rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-agency-bg transition-all disabled:opacity-50"
+              >
+                {isGlobalComplianceScanning ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Palette className="w-3.5 h-3.5" />}
+                {isGlobalComplianceScanning ? "Scanning CDN..." : "Scan Aesthetics"}
+              </button>
+              {globalComplianceReport && globalComplianceReport.flagged > 0 && (
+                <button 
+                  onClick={handleFixAllComplianceErrors}
+                  disabled={isFixingCompliance}
+                  className="px-6 py-3 bg-agency-accent text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 shadow-lg shadow-agency-accent/20"
+                >
+                  {isFixingCompliance ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+                  {isFixingCompliance ? "Harmonizing..." : "Fix All Errors"}
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-white/5 rounded-3xl border border-white/10 p-6 flex flex-col justify-center gap-4">
+            <div className="flex justify-between items-center">
+              <div className="text-[10px] font-black text-white/40 uppercase tracking-widest">Compliance Status</div>
+              {globalComplianceReport ? (
+                <div className={cn(
+                  "px-2 py-1 rounded text-[10px] font-black uppercase",
+                  globalComplianceReport.flagged === 0 ? "bg-emerald-500/20 text-emerald-400" : "bg-agency-accent/20 text-agency-accent"
+                )}>
+                  {globalComplianceReport.flagged === 0 ? 'CLEAN' : 'DEVIATIONS DETECTED'}
+                </div>
+              ) : (
+                <div className="px-2 py-1 bg-white/10 text-white/40 rounded text-[10px] font-black uppercase">PENDING SCAN</div>
+              )}
+            </div>
+            
+            <div className="flex items-end gap-1">
+              <span className="text-4xl font-black font-display text-white">{globalComplianceReport ? Math.round((globalComplianceReport.compliant / globalComplianceReport.total) * 100) : '--'}</span>
+              <span className="text-xl font-black font-display text-white/30 uppercase mb-1">% Match</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <div className="text-[8px] font-black text-white/40 uppercase">Total Nodes</div>
+                <div className="text-sm font-bold text-white">{globalComplianceReport?.total || '--'}</div>
+              </div>
+              <div className="space-y-1">
+                <div className="text-[8px] font-black text-white/40 uppercase">Flagged Shards</div>
+                <div className="text-sm font-bold text-agency-accent">{globalComplianceReport?.flagged || '--'}</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white/5 rounded-3xl border border-white/10 p-6 flex flex-col gap-4 overflow-y-auto max-h-[200px]">
+            <div className="text-[10px] font-black text-white/40 uppercase tracking-widest sticky top-0 bg-agency-ink pb-2">Active Protocol Issues</div>
+            {globalComplianceReport && globalComplianceReport.issues.length > 0 ? (
+              <div className="space-y-3">
+                {globalComplianceReport.issues.map((issue, idx) => (
+                  <div key={idx} className="flex gap-3 animate-in slide-in-from-left-2 duration-300" style={{ animationDelay: `${idx * 100}ms` }}>
+                    <div className="mt-1">
+                      <AlertTriangle className="w-3 h-3 text-agency-accent" />
+                    </div>
+                    <div className="text-[11px] text-white/70 font-medium leading-tight">{issue}</div>
+                  </div>
+                ))}
+              </div>
+            ) : globalComplianceReport ? (
+              <div className="h-full flex flex-col items-center justify-center text-center opacity-30">
+                <CheckCircle2 className="w-8 h-8 text-emerald-400 mb-2" />
+                <div className="text-[10px] font-black text-white uppercase">Aesthetic Harmony Verified</div>
+              </div>
+            ) : (
+              <div className="h-full flex items-center justify-center text-center opacity-20 italic text-[11px] text-white">Execute scan to identify protocol deviations...</div>
+            )}
+          </div>
+        </div>
+      </div>
       <AnimatePresence>
         {isIngesting && (
           <motion.div 
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="panel-card p-6 border-2 border-agency-accent bg-agency-accent/5 flex items-center justify-between"
+            className="panel-card p-6 border-2 border-agency-accent bg-agency-accent/5 flex items-center justify-between mt-8"
           >
             <div className="flex items-center gap-4">
               <div className="p-3 bg-agency-accent text-white rounded-xl">
@@ -11178,7 +11319,8 @@ const TAB_MAPPING: Record<string, Tab> = {
   'secure-dispatch': 'email-dispatch',
   'email-approvals': 'email-approvals',
   'email-tracking': 'email-tracking',
-  'email-audit': 'email-audit'
+  'email-audit': 'email-audit',
+  'intake': 'intake'
 };
 
 const ClientModal = ({ 
@@ -11773,7 +11915,7 @@ export default function App() {
   };
 
   const handleGlobalAction = async (action: string, category: string) => {
-    onAction(`Global Action Initiated: ${action}`, 'success');
+    addNotification(`Global Action Initiated: ${action}`, 'success');
     setIsActionModalOpen(false);
     
     // Inject agentic telemetry
@@ -11789,16 +11931,16 @@ export default function App() {
 
     // Special logic for "fruifful" results
     if (action === 'Budget Shift') {
-      onAction('AI AGENT: Reallocating $15,000 from Meta to TikTok based on ROAS (5.2x vs 3.8x).', 'info');
-      setTimeout(() => onAction('REALLOCATION COMPLETE: Ad performance stabilized.', 'success'), 2000);
+      addNotification('AI AGENT: Reallocating $15,000 from Meta to TikTok based on ROAS (5.2x vs 3.8x).', 'info');
+      setTimeout(() => addNotification('REALLOCATION COMPLETE: Ad performance stabilized.', 'success'), 2000);
     } else if (action === 'Batch Creatives') {
-      onAction('CREATIVE ENGINE: Synthesizing 20 variants using Vibe Library specs...', 'info');
-      setTimeout(() => onAction('SYNTHESIS COMPLETE: 20 assets pushed to Approval Shard.', 'success'), 2500);
+      addNotification('CREATIVE ENGINE: Synthesizing 20 variants using Vibe Library specs...', 'info');
+      setTimeout(() => addNotification('SYNTHESIS COMPLETE: 20 assets pushed to Approval Shard.', 'success'), 2500);
     } else if (action === 'Headless Crawl') {
-      onAction('SEO AGENT: Scanning 5,000 URLs for technical debt...', 'info');
-      setTimeout(() => onAction('CRAWL COMPLETE: 42 Critical LCP issues identified.', 'warning'), 3000);
+      addNotification('SEO AGENT: Scanning 5,000 URLs for technical debt...', 'info');
+      setTimeout(() => addNotification('CRAWL COMPLETE: 42 Critical LCP issues identified.', 'warning'), 3000);
     } else if (action === 'Launch New Spec') {
-      onAction('SYSTEM: Initializing new campaign shard with blueprint L2-A.', 'info');
+      addNotification('SYSTEM: Initializing new campaign shard with blueprint L2-A.', 'info');
     }
   };
 
@@ -11984,7 +12126,7 @@ export default function App() {
             </motion.div>
           )}
           
-          <SidebarItem icon={Settings} label="Settings" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
+          <SidebarItem icon={Settings} label="Settings" active={activeTab === 'settings'} path="/settings" />
           <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="sidebar-item w-full">
             <ChevronRight className={cn("w-5 h-5 transition-transform", isSidebarOpen && "rotate-180")} />
             {isSidebarOpen && <span className="text-sm">Collapse Sidebar</span>}
